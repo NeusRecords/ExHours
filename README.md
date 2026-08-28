@@ -109,12 +109,6 @@ npm install
 
 Copia `.env.example` como `.env` y configura los valores:
 
-```env
-PORT=3000
-SUPERVISOR_PIN=1234
-JWT_SECRET=cambia-esta-clave-en-produccion
-```
-
 Inicia la aplicacion:
 
 ```bash
