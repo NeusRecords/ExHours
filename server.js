@@ -8,7 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 
 const app = express();
-const port = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -33,8 +33,8 @@ app.use((error, req, res, next) => {
 
 initializeDatabase()
   .then(() => {
-    app.listen(port, () => {
-      console.log(`ExHours escuchando en http://localhost:${port}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Servidor ejecutándose en el puerto ${PORT}`);
     });
   })
   .catch((error) => {
