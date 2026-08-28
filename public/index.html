@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExHours | Horas extra</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Control operativo</p>
+        <h1>Horas extra</h1>
+      </div>
+      <div class="header-actions"><span class="status-dot">Sistema activo</span><button id="supervisor-login-link" class="login-link" type="button">Acceso Supervisor</button></div>
+    </header>
+
+    <section id="employee-view" class="role-view active" aria-labelledby="employee-tab">
+      <div class="workspace">
+        <form id="overtime-form" class="panel form-panel" enctype="multipart/form-data">
+          <div class="panel-heading"><p class="eyebrow">Empleado</p><h2>Registrar horas</h2></div>
+          <label>CC / Cédula<input name="cedula" id="employee-cedula" required inputmode="numeric" placeholder="Número de cédula"></label>
+          <label>Nombre Completo<input id="employee-name" name="employeeName" readonly placeholder="Se completará al validar la cédula"></label>
+          <label>Fecha<input name="workDate" type="date" required></label>
+          <label>Hora de Inicio<input name="horaInicio" type="time" required></label>
+          <label>Hora de Fin<input name="horaFin" type="time" required></label>
+          <label>Motivo<textarea name="reason" rows="4" required maxlength="500" placeholder="Describe el trabajo realizado"></textarea></label>
+          <label>Evidencia (opcional)<input id="evidencia" name="evidencia" type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf"></label>
+          <button type="submit">Enviar solicitud <span aria-hidden="true">&#8594;</span></button>
+          <p id="form-message" class="form-message" role="status"></p>
+        </form>
+
+        <section class="panel requests-panel">
+          <div class="panel-heading requests-heading"><div><p class="eyebrow">Empleado</p><h2>Mis solicitudes</h2></div><button id="employee-refresh" class="secondary-button" type="button">Actualizar</button></div>
+            <p class="view-hint">Escribe tu nombre en el formulario para consultar tu historial.</p>
+          <div id="employee-list" class="requests-list"><p class="empty-state">Aún no hay solicitudes registradas.</p></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="supervisor-view" class="role-view" aria-labelledby="supervisor-tab" hidden>
+      <section class="panel requests-panel supervisor-panel">
+        <div class="panel-heading requests-heading"><div><p class="eyebrow">Supervisor</p><h2>Solicitudes del Supervisor</h2></div><div class="supervisor-actions"><button id="export-csv" class="secondary-button" type="button">Exportar Reporte (CSV)</button><button id="supervisor-refresh" class="secondary-button" type="button">Actualizar</button><button id="supervisor-logout" class="logout-button" type="button">Cerrar Sesión</button></div></div>
+        <p class="view-hint">Revisa pendientes y consulta solicitudes aprobadas o rechazadas.</p>
+        <form id="supervisor-filters" class="supervisor-filters">
+          <label>Fecha Inicio<input name="desde" type="date"></label>
+          <label>Fecha Fin<input name="hasta" type="date"></label>
+          <label>Buscar por Empleado<input name="empleado" type="search" placeholder="Nombre o parte del nombre"></label>
+          <div class="filter-actions"><button type="submit">Filtrar</button><button id="clear-filters" class="secondary-button" type="button">Limpiar Filtros</button></div>
+        </form>
+        <p id="filter-status" class="filter-status" role="status" aria-live="polite" hidden></p>
+        <div id="pending-list" class="requests-list"><p class="empty-state">Cargando solicitudes pendientes...</p></div>
+        <section class="employee-management">
+          <div class="panel-heading"><p class="eyebrow">Autorizaciones</p><h2>Registrar Nuevo Empleado</h2></div>
+          <form id="employee-form" class="employee-form">
+            <label>Cédula de Ciudadanía<input name="cedula" required inputmode="numeric"></label>
+            <label>Nombre Completo<input name="nombre_completo" required maxlength="150"></label>
+            <label>Supervisor A Cargo<input name="supervisor_nombre" maxlength="150"></label>
+            <button type="submit">Autorizar empleado</button>
+          </form>
+          <p id="employee-message" class="form-message" role="status"></p>
+          <div id="employees-list" class="employees-list"><p class="empty-state">Cargando empleados autorizados...</p></div>
+        </section>
+      </section>
+    </section>
+  </main>
+  <dialog id="login-modal" class="login-modal">
+    <form id="login-form" method="dialog">
+      <button id="close-login" class="modal-close" type="button" aria-label="Cerrar">&times;</button>
+      <p class="eyebrow">Área restringida</p><h2>Acceso Supervisor</h2>
+      <label for="supervisor-pin">PIN de acceso<input id="supervisor-pin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>
+      <p id="login-message" class="form-message" role="alert"></p>
+      <button type="submit">Iniciar sesión</button>
+    </form>
+  </dialog>
+  <dialog id="request-modal" class="edit-modal">
+    <form id="request-edit-form">
+      <button class="modal-close" data-close-modal="request-modal" type="button" aria-label="Cerrar">&times;</button>
+      <p class="eyebrow">Solicitud</p><h2>Editar solicitud</h2>
+      <input name="id" type="hidden">
+      <label>CC / Cédula<input name="cedula" required></label>
+      <label>Fecha<input name="workDate" type="date" required></label>
+      <label>Hora de Inicio<input name="horaInicio" type="time" required></label>
+      <label>Hora de Fin<input name="horaFin" type="time" required></label>
+      <label>Motivo<textarea name="reason" rows="3" required maxlength="500"></textarea></label>
+      <label>Estado<select name="status"><option value="PENDIENTE">Pendiente</option><option value="APROBADO">Aprobado</option><option value="RECHAZADO">Rechazado</option></select></label>
+      <p id="request-edit-message" class="form-message" role="status"></p>
+      <button type="submit">Guardar cambios</button>
+    </form>
+  </dialog>
+  <dialog id="employee-modal" class="edit-modal">
+    <form id="employee-edit-form">
+      <button class="modal-close" data-close-modal="employee-modal" type="button" aria-label="Cerrar">&times;</button>
+      <p class="eyebrow">Directorio</p><h2>Editar empleado</h2>
+      <input name="id" type="hidden">
+      <label>Cédula de Ciudadanía<input name="cedula" required inputmode="numeric"></label>
+      <label>Nombre Completo<input name="nombre_completo" required maxlength="150"></label>
+      <label>Supervisor A Cargo<input name="supervisor_nombre" maxlength="150"></label>
+      <p id="employee-edit-message" class="form-message" role="status"></p>
+      <button type="submit">Guardar cambios</button>
+    </form>
+  </dialog>
+  <script src="/app.js"></script>
+</body>
+</html>
