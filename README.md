@@ -1,48 +1,176 @@
-# ExHours
+# ExHours - Gestion de Horas Extras
 
-Aplicación web para registrar y aprobar horas extra con Node.js, Express y SQLite.
+<p align="center">
+  <strong>Registro, aprobacion y liquidacion operativa de horas extras</strong>
+</p>
 
-## Estructura
+<p align="center">
+  <a href="https://github.com/NeusRecords/ExHours"><img src="https://img.shields.io/badge/NeusRecords-ExHours-e66b45?style=for-the-badge" alt="NeusRecords ExHours"></a>
+  <img src="https://img.shields.io/badge/Node.js-18%2B-3c873a?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js 18+"></a>
+  <img src="https://img.shields.io/badge/Express-5-17212b?style=for-the-badge&logo=express&logoColor=white" alt="Express 5">
+  <img src="https://img.shields.io/badge/SQLite-local-003b57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite">
+</p>
 
-- `server.js`: arranque de Express y middleware global.
-- `config/database.js`: conexión e inicialización del esquema SQLite, incluidos horarios y recargos.
-- `controllers/`: lógica de negocio y validaciones.
-- `routes/`: endpoints HTTP.
-- `middleware/authMiddleware.js`: protección de las operaciones de supervisor.
-- `public/`: frontend estático.
-- `public/uploads/`: evidencias adjuntas (JPG, JPEG, PNG o PDF), servidas mediante `/uploads`.
-- `employees`: empleados autorizados por el supervisor; las solicitudes nuevas se asocian mediante `cedula`.
-- `data/`: base de datos local, ignorada por Git.
+ExHours es una aplicacion web para registrar, revisar y exportar horas extras. Centraliza el flujo entre empleados y supervisores, calcula automaticamente la jornada diurna/nocturna y clasifica los recargos aplicables segun las reglas configuradas para Colombia.
 
-## Ejecutar
+> La aplicacion esta pensada para operar localmente con Node.js, Express y SQLite. Antes de usarla en produccion, configura secretos, HTTPS, copias de seguridad y los controles de identidad de tu organizacion.
+
+## Caracteristicas
+
+- Registro de solicitudes mediante cedula, fecha, hora de inicio, hora de fin y motivo.
+- Validacion contra un directorio de empleados autorizados.
+- Gestion de empleados por supervisor: alta, edicion, asignacion de supervisor y eliminacion.
+- Deteccion automatica de domingos y festivos colombianos.
+- Desglose de horas diurnas y nocturnas usando 06:00-19:00 y 19:00-06:00.
+- Clasificacion de turnos mixtos con detalle legible.
+- Evidencias opcionales en PDF, JPG, JPEG o PNG hasta 5 MB.
+- Bandeja de supervisor con filtros por fechas y empleado.
+- Revision con comentario obligatorio: aprobar o rechazar.
+- Edicion y eliminacion protegida de solicitudes.
+- Exportacion CSV compatible con Excel en espanol, con BOM UTF-8 y separador `;`.
+
+## Clasificacion de recargos
+
+| Concepto | Franja | Recargo |
+| --- | --- | ---: |
+| Extra Diurna | 06:00 a 19:00, dia habil | 25% |
+| Extra Nocturna | 19:00 a 06:00, dia habil | 75% |
+| Extra Diurna Dominical / Festiva | 06:00 a 19:00, domingo o festivo | 100% |
+| Extra Nocturna Dominical / Festiva | 19:00 a 06:00, domingo o festivo | 150% |
+
+Los rangos mixtos se guardan como `Mixta (Xh Diurna / Yh Nocturna)` y conservan el recargo de la franja predominante en la fila principal. El desglose completo queda disponible en `horas_diurnas`, `horas_nocturnas` y en el reporte.
+
+## Flujo de uso
+
+### Empleado
+
+1. Introduce la cedula registrada.
+2. El sistema valida y completa el nombre autorizado.
+3. Selecciona fecha, hora de inicio, hora de fin y motivo.
+4. Adjunta evidencia si aplica.
+5. Consulta el historial y los comentarios del supervisor.
+
+### Supervisor
+
+1. Entra desde **Acceso Supervisor**.
+2. Usa el PIN configurado.
+3. Autoriza empleados desde **Registrar Nuevo Empleado**.
+4. Filtra y revisa solicitudes pendientes, aprobadas o rechazadas.
+5. Deja un comentario y aprueba o rechaza.
+6. Exporta el reporte CSV con los filtros activos.
+
+## Stack tecnologico
+
+- **Backend:** Node.js, Express 5.
+- **Persistencia:** SQLite mediante `sqlite3`.
+- **Subidas:** `multer`, almacenamiento local en `public/uploads/`.
+- **Autenticacion:** JWT en cookie `HttpOnly` y token Bearer de respaldo.
+- **Frontend:** HTML, CSS y JavaScript nativo.
+
+## Estructura del proyecto
+
+```text
+ExHours/
+├── config/
+│   └── database.js
+├── controllers/
+│   ├── authController.js
+│   ├── employeeController.js
+│   └── overtimeController.js
+├── middleware/
+│   ├── authMiddleware.js
+│   └── uploadMiddleware.js
+├── public/
+│   ├── uploads/
+│   ├── app.js
+│   ├── index.html
+│   └── styles.css
+├── routes/
+│   ├── authRoutes.js
+│   ├── employeeRoutes.js
+│   └── overtimeRoutes.js
+├── data/
+│   └── overtime.sqlite
+├── .env.example
+├── package.json
+├── package-lock.json
+└── server.js
+```
+
+## Instalacion y ejecucion
+
+Requisitos: Node.js 18 o superior y npm.
 
 ```bash
+git clone https://github.com/NeusRecords/ExHours.git
+cd ExHours
 npm install
+```
+
+Copia `.env.example` como `.env` y configura los valores:
+
+```env
+PORT=3000
+SUPERVISOR_PIN=1234
+JWT_SECRET=cambia-esta-clave-en-produccion
+```
+
+Inicia la aplicacion:
+
+```bash
 npm start
 ```
 
-Abrir `http://localhost:3000`. Para desarrollo usar `npm run dev`.
+Para desarrollo:
 
-El acceso de supervisor usa `SUPERVISOR_PIN` del archivo `.env` (por defecto `1234` en desarrollo) y una cookie JWT `HttpOnly`. En producción se debe definir también un `JWT_SECRET` fuerte y cambiar el PIN.
+```bash
+npm run dev
+```
 
-### API
+Abre [http://localhost:3000](http://localhost:3000).
 
-- `GET /api/overtime`: listar solicitudes.
-- `POST /api/overtime`: crear una solicitud `multipart/form-data` con `employeeName`, `workDate`, `horaInicio`, `horaFin`, `reason` y el archivo opcional `evidencia`. Se permiten JPG, JPEG, PNG o PDF hasta 5 MB. El backend calcula `total_horas`, `tipo_hora` y `porcentaje_recargo`.
-- `GET /api/overtime/supervisor/pending`: listar pendientes; requiere sesión de supervisor. Acepta `desde`, `hasta` y `empleado` como filtros opcionales.
-- `GET /api/overtime/supervisor/requests`: consultar solicitudes de cualquier estado en el panel Supervisor; requiere sesión y acepta `desde`, `hasta` y `empleado`.
-- `PATCH /api/overtime/:id/review`: guardar `status` (`APROBADO` o `RECHAZADO`) y `comment`; requiere sesión de supervisor.
-- `GET /api/overtime/export`: exportar las aprobadas con horario, tipo CST y recargo en CSV; requiere sesión de supervisor y acepta los mismos filtros `desde`, `hasta` y `empleado`.
-- `POST /api/employees`: autorizar un empleado con `cedula` y `nombre_completo`; requiere sesión de supervisor.
-- `GET /api/employees`: listar empleados autorizados; requiere sesión de supervisor.
-- `GET /api/employees/search?cc=...`: buscar una cédula para validar el registro antes de crear una solicitud.
-- `PUT /api/employees/:id`: editar cédula, nombre y supervisor asignado; requiere sesión de supervisor.
-- `DELETE /api/employees/:id`: eliminar un empleado del directorio; requiere sesión de supervisor.
-- `PUT /api/overtime/:id`: editar cédula, fecha, horario, motivo o estado de una solicitud; requiere sesión de supervisor.
-- `DELETE /api/overtime/:id`: eliminar una solicitud; requiere sesión de supervisor.
+## API principal
 
-Los festivos colombianos se calculan localmente con fechas fijas, festivos trasladables según la Ley Emiliani y fechas móviles relacionadas con Pascua/Semana Santa. Las solicitudes recibidas en domingo o festivo guardan `es_festivo = 1` y aplican los recargos dominicales/festivos.
-- `POST /api/auth/login`: autenticar con `{ "pin": "..." }`.
-- `POST /api/auth/logout`: cerrar la sesión de supervisor.
+### Autenticacion
 
-La clasificación usa jornada diurna de 06:00 a 19:00 y nocturna de 19:00 a 06:00. El sistema guarda `horas_diurnas` y `horas_nocturnas`; en un rango mixto `tipo_hora` queda como `Mixta (Xh Diurna / Yh Nocturna)` y el detalle muestra cada concepto por separado. Los porcentajes son `Extra Diurna` 25%, `Extra Nocturna` 75%, `Extra Diurna Dominical / Festiva` 100% y `Extra Nocturna Dominical / Festiva` 150%. Para una solicitud mixta se conserva el recargo de la franja predominante, dado que cada fila tiene un único porcentaje en el esquema actual.
+- `POST /api/auth/login`: iniciar sesion con `{ "pin": "..." }`.
+- `POST /api/auth/logout`: cerrar sesion.
+
+### Empleados
+
+- `POST /api/employees`: autorizar empleado. Requiere supervisor.
+- `GET /api/employees`: listar empleados autorizados. Requiere supervisor.
+- `GET /api/employees/search?cc=...`: validar una cedula.
+- `PUT /api/employees/:id`: editar empleado. Requiere supervisor.
+- `DELETE /api/employees/:id`: eliminar empleado. Requiere supervisor.
+
+### Solicitudes
+
+- `POST /api/overtime`: crear solicitud como `multipart/form-data`.
+- `GET /api/overtime?cedula=...`: consultar historial por cedula.
+- `GET /api/overtime/supervisor/requests`: consultar solicitudes filtrables. Requiere supervisor.
+- `GET /api/overtime/supervisor/pending`: consultar solo pendientes. Requiere supervisor.
+- `PATCH /api/overtime/:id/review`: aprobar o rechazar con comentario. Requiere supervisor.
+- `PUT /api/overtime/:id`: editar una solicitud. Requiere supervisor.
+- `DELETE /api/overtime/:id`: eliminar una solicitud. Requiere supervisor.
+- `GET /api/overtime/export`: exportar aprobadas en CSV. Requiere supervisor.
+
+Los filtros opcionales para Supervisor y CSV son `desde`, `hasta` y `empleado`.
+
+## Seguridad y datos locales
+
+- No subas `.env`, `data/*.sqlite` ni archivos de `public/uploads/`.
+- Cambia `SUPERVISOR_PIN` y `JWT_SECRET` antes de cualquier despliegue.
+- Las evidencias se sirven localmente desde `/uploads/<archivo>`.
+- La autorizacion del empleado se valida en backend, no solo en el navegador.
+- Para un entorno real, considera almacenamiento privado de evidencias, HTTPS, control de acceso por usuarios y auditoria.
+
+## Estado del proyecto
+
+Version inicial funcional para registro, autorizacion, revision y exportacion de horas extras.
+
+## Autor
+
+Desarrollado y mantenido por [NeusRecords](https://github.com/NeusRecords).
+
+**NeusRecords - ExHours**
