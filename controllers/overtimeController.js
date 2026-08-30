@@ -231,6 +231,42 @@ function getRequestFilters(query = {}) {
   return { filters, params };
 }
 
+function normalizeRequestBreakdown(request) {
+  if (!request || typeof request !== 'object') return request;
+
+  const workDate = request.work_date ?? request.workDate ?? request.fecha ?? null;
+  const startTime = request.hora_inicio ?? request.horaInicio ?? null;
+  const endTime = request.hora_fin ?? request.horaFin ?? null;
+  const cedula = request.cedula ?? null;
+
+  const schedule = workDate && startTime && endTime && isValidDate(workDate)
+    ? classifySchedule(workDate, startTime, endTime, cedula)
+    : null;
+
+  if (!schedule) return request;
+
+  const breakdown = {
+    ordinaryDominicalHours: Number(schedule.ordinaryDominicalHours ?? 0),
+    ordinaryNocturnalHours: Number(schedule.ordinaryNocturnalHours ?? 0),
+    extraDiurnaDominicalHours: Number(schedule.extraDiurnaDominicalHours ?? 0),
+    extraNocturnaDominicalHours: Number(schedule.extraNocturnaDominicalHours ?? 0),
+    breakdown: {
+      ordinaryDominicalHours: Number(schedule.ordinaryDominicalHours ?? 0),
+      ordinaryNocturnalHours: Number(schedule.ordinaryNocturnalHours ?? 0),
+      extraDiurnaDominicalHours: Number(schedule.extraDiurnaDominicalHours ?? 0),
+      extraNocturnaDominicalHours: Number(schedule.extraNocturnaDominicalHours ?? 0),
+      totalHours: Number(schedule.totalHours ?? 0),
+      diurnalHours: Number(schedule.diurnalHours ?? 0),
+      nocturnalHours: Number(schedule.nocturnalHours ?? 0),
+      type: schedule.type ?? null,
+      detail: schedule.detail ?? null,
+      surcharge: schedule.surcharge ?? null,
+    },
+  };
+
+  return { ...request, ...breakdown, breakdown: breakdown.breakdown };
+}
+
 async function listRequests(req, res, next) {
   try {
     const cedula = req.query.cedula?.trim();
@@ -242,7 +278,7 @@ async function listRequests(req, res, next) {
       query,
       params
     );
-    res.json(requests);
+    res.json(requests.map((request) => normalizeRequestBreakdown(request)));
   } catch (error) {
     next(error);
   }
@@ -256,7 +292,7 @@ async function listPendingRequests(req, res, next) {
       `SELECT * FROM overtime_requests WHERE ${filters.join(' AND ')} ORDER BY work_date ASC, created_at ASC`,
       params
     );
-    res.json(requests);
+    res.json(requests.map((request) => normalizeRequestBreakdown(request)));
   } catch (error) {
     next(error);
   }
@@ -346,7 +382,7 @@ async function createRequest(req, res, next) {
       [employee.nombre_completo, cedula.trim(), workDate, schedule.totalHours, horaInicio, horaFin, schedule.totalHours, schedule.diurnalHours, schedule.nocturnalHours, schedule.type, schedule.surcharge, reason.trim(), req.file ? `/uploads/${req.file.filename}` : null, schedule.isHolidayOrSunday]
     );
     const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = $1', [result.lastID]);
-    res.status(201).json(request);
+    res.status(201).json(normalizeRequestBreakdown(request));
   } catch (error) {
     next(error);
   }
@@ -396,7 +432,7 @@ async function updateRequest(req, res, next) {
       [employee.nombre_completo, cedula, workDate, schedule.totalHours, horaInicio, horaFin, schedule.totalHours, schedule.diurnalHours, schedule.nocturnalHours, schedule.type, schedule.surcharge, reason, status, reviewComment, status, req.params.id]
     );
     const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = $1', [req.params.id]);
-    res.json(request);
+    res.json(normalizeRequestBreakdown(request));
   } catch (error) { next(error); }
 }
 
