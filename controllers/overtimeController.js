@@ -3,12 +3,21 @@ const { database } = require('../config/database');
 
 function normalizeWorkDate(value) {
   if (!value && value !== '') return null;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return value.toISOString().slice(0, 10);
+  }
+
   if (typeof value !== 'string') return null;
+
   const trimmed = value.trim();
   if (!trimmed) return null;
+
   const isoDate = trimmed.match(/^\d{4}-\d{2}-\d{2}T.*$/)
     ? trimmed.split('T')[0]
     : trimmed;
+
   return /^\d{4}-\d{2}-\d{2}$/.test(isoDate) ? isoDate : null;
 }
 
