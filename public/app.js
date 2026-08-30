@@ -137,6 +137,26 @@ async function exportApprovedRequests() {
   URL.revokeObjectURL(downloadUrl);
 }
 
+async function exportConsolidatedRequests() {
+  const query = activeFilterQuery();
+  const response = await fetch(`/api/overtime/export-consolidated${query ? `?${query}` : ''}`, { credentials: 'include', headers: supervisorHeaders() });
+  if (response.status === 401) {
+    showEmployeeView();
+    throw new Error('La sesión de supervisor ha expirado');
+  }
+  if (!response.ok) throw new Error('No se pudo generar el informe consolidado');
+
+  const workbookBlob = await response.blob();
+  const downloadUrl = URL.createObjectURL(workbookBlob);
+  const downloadLink = document.createElement('a');
+  downloadLink.href = downloadUrl;
+  downloadLink.download = 'Consolidado_Horas_Extras.xlsx';
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  downloadLink.remove();
+  URL.revokeObjectURL(downloadUrl);
+}
+
 function showEmployeeView() {
   document.querySelector('#supervisor-view').hidden = true;
   document.querySelector('#employee-view').hidden = false;
@@ -307,6 +327,7 @@ form.elements.cedula.addEventListener('blur', () => validateEmployee().catch((er
 document.querySelector('#employee-refresh').addEventListener('click', () => loadEmployeeHistory().catch((error) => { employeeList.innerHTML = `<p class="empty-state">${error.message}</p>`; }));
 document.querySelector('#supervisor-refresh').addEventListener('click', () => loadPendingRequests().catch((error) => { pendingList.innerHTML = `<p class="empty-state">${error.message}</p>`; }));
 document.querySelector('#export-csv').addEventListener('click', () => exportApprovedRequests().catch((error) => { message.textContent = error.message; }));
+document.querySelector('#btnExportConsolidated').addEventListener('click', () => exportConsolidatedRequests().catch((error) => { message.textContent = error.message; }));
 supervisorFilters.addEventListener('submit', async (event) => {
   event.preventDefault();
   filterButton.textContent = 'Filtrando...';

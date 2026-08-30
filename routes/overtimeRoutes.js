@@ -4,6 +4,7 @@ const {
   listPendingRequests,
   listSupervisorRequests,
   exportApprovedRequests,
+  exportConsolidatedRequests,
   createRequest,
   reviewRequest,
   updateRequest,
@@ -18,6 +19,7 @@ router.get('/', listRequests);
 router.get('/supervisor/pending', requireSupervisor, listPendingRequests);
 router.get('/supervisor/requests', requireSupervisor, listSupervisorRequests);
 router.get('/export', requireSupervisor, exportApprovedRequests);
+router.get('/export-consolidated', requireSupervisor, exportConsolidatedRequests);
 router.post('/', upload.single('evidencia'), createRequest);
 router.patch('/:id/review', requireSupervisor, reviewRequest);
 router.put('/:id', requireSupervisor, updateRequest);

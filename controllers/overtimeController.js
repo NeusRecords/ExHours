@@ -412,6 +412,67 @@ async function exportApprovedRequests(req, res, next) {
   }
 }
 
+async function exportConsolidatedRequests(req, res, next) {
+  try {
+    const { filters, params } = getRequestFilters(req.query);
+    filters.unshift("LOWER(status) = 'aprobado'");
+    const requests = await database.allAsync(
+      `SELECT * FROM overtime_requests WHERE ${filters.join(' AND ')} ORDER BY employee_name ASC, cedula ASC`,
+      params
+    );
+    const consolidatedMap = new Map();
+    const safeNumber = (value) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    requests.forEach((request) => {
+      const normalizedRequest = normalizeRequestBreakdown(request);
+      const breakdown = normalizedRequest.breakdown || normalizedRequest;
+      const cedula = request.cedula || 'SIN_CEDULA';
+      const current = consolidatedMap.get(cedula) || {
+        'Cédula': cedula,
+        'Nombre Completo': request.employee_name || request.nombre_completo || request.nombre || '',
+        'Total Solicitudes': 0,
+        'Total Horas': 0,
+        HED: 0,
+        HEN: 0,
+        RN: 0,
+        RNF: 0,
+        HF: 0,
+        HEFD: 0,
+        HEFN: 0,
+      };
+
+      current['Total Solicitudes'] += 1;
+      current['Total Horas'] += safeNumber(request.total_horas ?? request.totalHours ?? breakdown.totalHours);
+      ['HED', 'HEN', 'RN', 'RNF', 'HF', 'HEFD', 'HEFN'].forEach((field) => {
+        current[field] += safeNumber(breakdown[field.toLowerCase()]);
+      });
+      consolidatedMap.set(cedula, current);
+    });
+
+    const rowsForExcel = Array.from(consolidatedMap.values()).map((employee) => {
+      const rounded = { ...employee };
+      ['Total Horas', 'HED', 'HEN', 'RN', 'RNF', 'HF', 'HEFD', 'HEFN'].forEach((field) => {
+        rounded[field] = Number(employee[field].toFixed(2));
+      });
+      return rounded;
+    });
+    const worksheet = XLSX.utils.json_to_sheet(rowsForExcel);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Consolidado');
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Consolidado_Horas_Extras.xlsx');
+    return res.send(buffer);
+  } catch (error) {
+    console.error('Error al exportar consolidado:', error);
+    return res.status(500).json({ error: 'Error al generar el consolidado en Excel' });
+  }
+}
+
 async function createRequest(req, res, next) {
   const { cedula, workDate, horaInicio, horaFin, reason } = req.body || {};
   const schedule = isValidDate(workDate) ? classifySchedule(workDate, horaInicio, horaFin, cedula) : null;
@@ -513,4 +574,4 @@ async function deleteRequest(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { listRequests, listPendingRequests, listSupervisorRequests, exportApprovedRequests, createRequest, reviewRequest, updateRequest, deleteRequest, esFestivoODomingo, classifySchedule };
+module.exports = { listRequests, listPendingRequests, listSupervisorRequests, exportApprovedRequests, exportConsolidatedRequests, createRequest, reviewRequest, updateRequest, deleteRequest, esFestivoODomingo, classifySchedule };
