@@ -1,3 +1,4 @@
+const ExcelJS = require('exceljs');
 const { database } = require('../config/database');
 
 function isValidDate(value) {
@@ -382,29 +383,72 @@ async function exportApprovedRequests(req, res, next) {
     const { filters, params } = getRequestFilters(req.query);
     filters.unshift("LOWER(status) = 'aprobado'");
     const requests = await database.allAsync(
-      `SELECT employee_name, work_date, hora_inicio, hora_fin, total_horas, horas_diurnas, horas_nocturnas, tipo_hora, porcentaje_recargo, reason, status, review_comment, evidencia_url, es_festivo, created_at FROM overtime_requests WHERE ${filters.join(' AND ')} ORDER BY work_date DESC, created_at DESC`,
+      `SELECT * FROM overtime_requests WHERE ${filters.join(' AND ')} ORDER BY work_date DESC, created_at DESC`,
       params
     );
-    const headers = ['HED', 'HEN', 'RN', 'RNF', 'HF', 'HEFD', 'HEFN'];
-    const rows = requests.map((request) => {
-      const breakdown = normalizeRequestBreakdown(request).breakdown || {};
-      return [
-        breakdown.hed ?? 0,
-        breakdown.hen ?? 0,
-        breakdown.rn ?? 0,
-        breakdown.rnf ?? 0,
-        breakdown.hf ?? 0,
-        breakdown.hefd ?? 0,
-        breakdown.hefn ?? 0,
-      ];
-    });
-    const csv = [headers, ...rows].map((row) => row.map((value) => csvValue(value)).join(';')).join('\r\n');
 
-    res.set({
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': 'attachment; filename=horas_extras_aprobadas.csv',
+    const rowsForExcel = requests.map((reqRow) => {
+      const b = classifySchedule(
+        reqRow.work_date || reqRow.fecha,
+        reqRow.hora_inicio || reqRow.horaInicio,
+        reqRow.hora_fin || reqRow.horaFin,
+        reqRow.cedula
+      ) || {
+        hed: 0,
+        hen: 0,
+        rn: 0,
+        rnf: 0,
+        hf: 0,
+        hefd: 0,
+        hefn: 0,
+      };
+
+      return {
+        'Cédula': reqRow.cedula || '',
+        'Nombre Completo': reqRow.nombre_completo || reqRow.employee_name || reqRow.nombre || '',
+        'Fecha': reqRow.work_date ? String(reqRow.work_date).substring(0, 10) : '',
+        'Hora Inicio': reqRow.hora_inicio || '',
+        'Hora Fin': reqRow.hora_fin || '',
+        'Total Horas': parseFloat(reqRow.total_horas || reqRow.totalHours || 0),
+        'Motivo': reqRow.motivo || reqRow.reason || '',
+        'Estado': reqRow.status || 'APROBADA',
+        'HED': parseFloat(b.hed || 0),
+        'HEN': parseFloat(b.hen || 0),
+        'RN': parseFloat(b.rn || 0),
+        'RNF': parseFloat(b.rnf || 0),
+        'HF': parseFloat(b.hf || 0),
+        'HEFD': parseFloat(b.hefd || 0),
+        'HEFN': parseFloat(b.hefn || 0),
+      };
     });
-    res.send(`\uFEFF${csv}\r\n`);
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Horas Extras');
+    worksheet.columns = [
+      { header: 'Cédula', key: 'Cédula', width: 18 },
+      { header: 'Nombre Completo', key: 'Nombre Completo', width: 28 },
+      { header: 'Fecha', key: 'Fecha', width: 14 },
+      { header: 'Hora Inicio', key: 'Hora Inicio', width: 14 },
+      { header: 'Hora Fin', key: 'Hora Fin', width: 14 },
+      { header: 'Total Horas', key: 'Total Horas', width: 12 },
+      { header: 'Motivo', key: 'Motivo', width: 28 },
+      { header: 'Estado', key: 'Estado', width: 14 },
+      { header: 'HED', key: 'HED', width: 10 },
+      { header: 'HEN', key: 'HEN', width: 10 },
+      { header: 'RN', key: 'RN', width: 10 },
+      { header: 'RNF', key: 'RNF', width: 10 },
+      { header: 'HF', key: 'HF', width: 10 },
+      { header: 'HEFD', key: 'HEFD', width: 10 },
+      { header: 'HEFN', key: 'HEFN', width: 10 },
+    ];
+    worksheet.addRows(rowsForExcel);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=horas_extras_aprobadas.xlsx',
+    });
+    res.send(buffer);
   } catch (error) {
     next(error);
   }
