@@ -63,6 +63,22 @@ async function validateEmployee() {
   await loadEmployeeHistory();
 }
 
+function formatDateValue(value) {
+  if (!value) return '';
+  const dateString = String(value).trim();
+  if (!dateString) return '';
+  return dateString.includes('T') ? dateString.split('T')[0] : dateString.substring(0, 10);
+}
+
+function formatPercentage(value) {
+  if (value == null || value === '') return '0%';
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return '0%';
+  return Number.isInteger(numericValue)
+    ? `${numericValue}%`
+    : `${Number(numericValue.toFixed(2)).toString()}%`;
+}
+
 function formatFilterDate(value) {
   if (!value) return '';
   return value.split('-').reverse().join('/');
@@ -142,7 +158,9 @@ async function loadEmployees() {
 function renderEmployeeRequest(request) {
   const evidence = request.evidencia_url ? `<a class="evidence-link" href="${escapeHtml(request.evidencia_url)}" target="_blank" rel="noopener">Ver evidencia</a>` : '';
   const holidayBadge = request.es_festivo ? '<span class="holiday-badge">Festivo/Domingo</span>' : '';
-  return `<article class="request"><div><p class="request-title">${escapeHtml(request.work_date)} · ${request.total_horas ?? request.hours} h ${holidayBadge}</p><p class="request-meta">${escapeHtml(request.hora_inicio || '--:--')} - ${escapeHtml(request.hora_fin || '--:--')} · ${request.horas_diurnas ?? 0} h diurnas · ${request.horas_nocturnas ?? 0} h nocturnas</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(request.tipo_hora || 'Sin clasificar')}</strong> · ${request.porcentaje_recargo ?? 0}%</p><p class="request-reason">${escapeHtml(request.reason)}</p>${request.review_comment ? `<p class="review-comment"><strong>Comentario del supervisor:</strong> ${escapeHtml(request.review_comment)}</p>` : ''}${evidence}</div><span class="badge ${request.status.toLowerCase()}">${statusLabels[request.status]}</span></article>`;
+  const workDate = formatDateValue(request.work_date);
+  const surcharge = formatPercentage(request.porcentaje_recargo);
+  return `<article class="request"><div><p class="request-title">${escapeHtml(workDate)} · ${request.total_horas ?? request.hours} h ${holidayBadge}</p><p class="request-meta">${escapeHtml(request.hora_inicio || '--:--')} - ${escapeHtml(request.hora_fin || '--:--')} · ${request.horas_diurnas ?? 0} h diurnas · ${request.horas_nocturnas ?? 0} h nocturnas</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(request.tipo_hora || 'Sin clasificar')}</strong> · ${surcharge}</p><p class="request-reason">${escapeHtml(request.reason)}</p>${request.review_comment ? `<p class="review-comment"><strong>Comentario del supervisor:</strong> ${escapeHtml(request.review_comment)}</p>` : ''}${evidence}</div><span class="badge ${request.status.toLowerCase()}">${statusLabels[request.status]}</span></article>`;
 }
 
 function renderPendingRequest(request) {
@@ -155,13 +173,15 @@ function renderPendingRequest(request) {
     : request.tipo_hora || 'Sin clasificar';
   const evidence = request.evidencia_url ? `<a class="evidence-link" href="${escapeHtml(request.evidencia_url)}" target="_blank" rel="noopener">Ver evidencia</a>` : '';
   const holidayBadge = request.es_festivo ? '<span class="holiday-badge">Festivo/Domingo</span>' : '';
-  return `<article class="request supervisor-request"><div><p class="request-title">${escapeHtml(request.employee_name)} · ${request.work_date} ${holidayBadge}</p><p class="request-meta">Horario: ${escapeHtml(request.hora_inicio || '--:--')} - ${escapeHtml(request.hora_fin || '--:--')}</p><p class="request-meta">Total: ${request.total_horas ?? request.hours} h · Diurnas: ${request.horas_diurnas ?? 0} h · Nocturnas: ${request.horas_nocturnas ?? 0} h</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(detail)}</strong> · Recargo: <strong>${request.porcentaje_recargo ?? 0}%</strong></p><p class="request-reason">${escapeHtml(request.reason)}</p>${evidence}</div><div class="request-actions">${reviewForm}<div class="row-actions"><button class="action-link" data-edit-request="${request.id}" type="button">Editar</button><button class="action-link danger-link" data-delete-request="${request.id}" type="button">Eliminar</button></div></div></article>`;
+  const workDate = formatDateValue(request.work_date);
+  const surcharge = formatPercentage(request.porcentaje_recargo);
+  return `<article class="request supervisor-request"><div><p class="request-title">${escapeHtml(request.employee_name)} · ${escapeHtml(workDate)} ${holidayBadge}</p><p class="request-meta">Horario: ${escapeHtml(request.hora_inicio || '--:--')} - ${escapeHtml(request.hora_fin || '--:--')}</p><p class="request-meta">Total: ${request.total_horas ?? request.hours} h · Diurnas: ${request.horas_diurnas ?? 0} h · Nocturnas: ${request.horas_nocturnas ?? 0} h</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(detail)}</strong> · Recargo: <strong>${surcharge}</strong></p><p class="request-reason">${escapeHtml(request.reason)}</p>${evidence}</div><div class="request-actions">${reviewForm}<div class="row-actions"><button class="action-link" data-edit-request="${request.id}" type="button">Editar</button><button class="action-link danger-link" data-delete-request="${request.id}" type="button">Eliminar</button></div></div></article>`;
 }
 
 function openRequestEditor(id) {
   const request = requestCache.get(String(id));
   if (!request) return;
-  Object.entries({ id, cedula: request.cedula || '', workDate: request.work_date, horaInicio: request.hora_inicio, horaFin: request.hora_fin, reason: request.reason, status: request.status }).forEach(([name, value]) => { requestEditForm.elements[name].value = value; });
+  Object.entries({ id, cedula: request.cedula || '', workDate: formatDateValue(request.work_date), horaInicio: request.hora_inicio, horaFin: request.hora_fin, reason: request.reason, status: request.status }).forEach(([name, value]) => { requestEditForm.elements[name].value = value; });
   requestEditMessage.textContent = '';
   requestModal.showModal();
 }
