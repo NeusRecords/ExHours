@@ -8,6 +8,8 @@ const loginMessage = document.querySelector('#login-message');
 const supervisorFilters = document.querySelector('#supervisor-filters');
 const filterStatus = document.querySelector('#filter-status');
 const filterButton = supervisorFilters.querySelector('button[type="submit"]');
+const supervisorTabs = document.querySelectorAll('.supervisor-tabs-menu .tab-btn');
+let activeSupervisorStatus = 'PENDIENTE';
 const employeeForm = document.querySelector('#employee-form');
 const employeeMessage = document.querySelector('#employee-message');
 const employeesList = document.querySelector('#employees-list');
@@ -108,8 +110,11 @@ async function loadPendingRequests({ announce = false } = {}) {
   if (!response.ok) throw new Error('No se pudieron cargar las solicitudes pendientes');
   const requests = await response.json();
   requests.forEach((request) => requestCache.set(String(request.id), request));
-  pendingList.innerHTML = requests.length ? requests.map(renderPendingRequest).join('') : '<p class="empty-state">No se encontraron solicitudes para el rango seleccionado.</p>';
-  if (announce) showFilterStatus(requests.length);
+  const statusMap = { APROBADA: 'APROBADO', RECHAZADA: 'RECHAZADO' };
+  const selectedStatus = statusMap[activeSupervisorStatus] || activeSupervisorStatus;
+  const filteredRequests = requests.filter((request) => request.status === selectedStatus);
+  pendingList.innerHTML = filteredRequests.length ? filteredRequests.map(renderPendingRequest).join('') : '<p class="empty-state">No se encontraron solicitudes para el rango seleccionado.</p>';
+  if (announce) showFilterStatus(filteredRequests.length);
 }
 
 async function exportApprovedRequests() {
@@ -324,6 +329,17 @@ document.querySelector('#clear-filters').addEventListener('click', () => {
   filterStatus.hidden = true;
   filterStatus.classList.remove('empty');
   loadPendingRequests().catch((error) => { pendingList.innerHTML = `<p class="empty-state">${error.message}</p>`; });
+});
+supervisorTabs.forEach((tab) => {
+  tab.addEventListener('click', () => {
+    activeSupervisorStatus = tab.dataset.status;
+    supervisorTabs.forEach((button) => {
+      const isActive = button === tab;
+      button.classList.toggle('active', isActive);
+      button.setAttribute('aria-selected', String(isActive));
+    });
+    loadPendingRequests().catch((error) => { pendingList.innerHTML = `<p class="empty-state">${error.message}</p>`; });
+  });
 });
 
 employeeForm.addEventListener('submit', async (event) => {

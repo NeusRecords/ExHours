@@ -50,6 +50,11 @@
           <div class="filter-actions"><button type="submit">Filtrar</button><button id="clear-filters" class="secondary-button" type="button">Limpiar Filtros</button></div>
         </form>
         <p id="filter-status" class="filter-status" role="status" aria-live="polite" hidden></p>
+        <div class="supervisor-tabs-menu margin-v" role="tablist" aria-label="Filtrar solicitudes por estado">
+          <button type="button" class="tab-btn active" data-status="PENDIENTE" role="tab" aria-selected="true">Esperando aprobación</button>
+          <button type="button" class="tab-btn" data-status="APROBADA" role="tab" aria-selected="false">Aprobadas</button>
+          <button type="button" class="tab-btn" data-status="RECHAZADA" role="tab" aria-selected="false">Rechazadas</button>
+        </div>
         <div id="pending-list" class="requests-list"><p class="empty-state">Cargando solicitudes pendientes...</p></div>
         <section class="employee-management">
           <div class="panel-heading"><p class="eyebrow">Autorizaciones</p><h2>Registrar Nuevo Empleado</h2></div>
