@@ -134,14 +134,21 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
       detail += ')';
     }
 
+    const hed = 0;
+    const hen = 0;
+    const rn = 0;
+    const rnf = Number(ordinaryNocturnalHours.toFixed(2));
+    const hf = Number(ordinaryDiurnalHours.toFixed(2));
+    const hefd = Number(extraDiurnalHours.toFixed(2));
+    const hefn = Number(extraNocturnalHours.toFixed(2));
     const breakdown = {
-      hed: 0,
-      hen: 0,
-      rn: 0,
-      rnf: Number(ordinaryNocturnalHours.toFixed(2)),
-      hf: Number(ordinaryTotalHours.toFixed(2)),
-      hefd: Number(extraDiurnalHours.toFixed(2)),
-      hefn: Number(extraNocturnalHours.toFixed(2)),
+      hed: Number(hed || 0),
+      hen: Number(hen || 0),
+      rn: Number(rn || 0),
+      rnf: Number(rnf || 0),
+      hf: Number(hf || 0),
+      hefd: Number(hefd || 0),
+      hefn: Number(hefn || 0),
     };
 
     return {
@@ -244,7 +251,7 @@ function getRequestFilters(query = {}) {
 }
 
 function buildOfficialBreakdown(schedule) {
-  const source = schedule && typeof schedule === 'object' && schedule.breakdown ? schedule.breakdown : schedule || {};
+  const source = schedule && typeof schedule === 'object' && schedule.breakdown ? schedule.breakdown : (schedule || {});
 
   const breakdown = {
     hed: Number(source.hed ?? source.extraDiurnalHours ?? source.extra_diurnal_hours ?? 0),
@@ -257,13 +264,17 @@ function buildOfficialBreakdown(schedule) {
   };
 
   if (source.isHolidayOrSunday || schedule?.isHolidayOrSunday) {
+    const ordinaryDiurnal = Number(source.ordinaryDiurnalHours ?? source.ordinary_diurnal_hours ?? 0);
+    const ordinaryNocturnal = Number(source.ordinaryNocturnalHours ?? source.ordinary_nocturnal_hours ?? 0);
+    const extraDiurnal = Number(source.extraDiurnaDominicalHours ?? source.extra_diurna_dominical_hours ?? 0);
+    const extraNocturnal = Number(source.extraNocturnaDominicalHours ?? source.extra_nocturna_dominical_hours ?? 0);
     breakdown.hed = Number(source.hed ?? 0);
     breakdown.hen = Number(source.hen ?? 0);
     breakdown.rn = Number(source.rn ?? 0);
-    breakdown.rnf = Number(source.rnf ?? source.ordinaryNocturnalHours ?? source.ordinary_nocturnal_hours ?? 0);
-    breakdown.hf = Number(source.hf ?? source.ordinaryDominicalHours ?? source.ordinary_dominical_hours ?? 0);
-    breakdown.hefd = Number(source.hefd ?? source.extraDiurnaDominicalHours ?? source.extra_diurna_dominical_hours ?? 0);
-    breakdown.hefn = Number(source.hefn ?? source.extraNocturnaDominicalHours ?? source.extra_nocturna_dominical_hours ?? 0);
+    breakdown.rnf = Number(source.rnf ?? ordinaryNocturnal);
+    breakdown.hf = Number(source.hf ?? ordinaryDiurnal);
+    breakdown.hefd = Number(source.hefd ?? extraDiurnal);
+    breakdown.hefn = Number(source.hefn ?? extraNocturnal);
   }
 
   return breakdown;
@@ -281,15 +292,18 @@ function normalizeRequestBreakdown(request) {
     ? classifySchedule(workDate, startTime, endTime, cedula)
     : null;
 
-  const officialBreakdown = buildOfficialBreakdown(schedule || {
-    hed: request.hed ?? request.hed ?? 0,
-    hen: request.hen ?? request.hen ?? 0,
+  const source = schedule || {
+    hed: request.hed ?? 0,
+    hen: request.hen ?? 0,
     rn: request.rn ?? 0,
     rnf: request.rnf ?? 0,
-    hf: request.hf ?? request.hf ?? 0,
+    hf: request.hf ?? 0,
     hefd: request.hefd ?? 0,
     hefn: request.hefn ?? 0,
-  });
+    isHolidayOrSunday: request.es_festivo || request.isHolidayOrSunday || false,
+  };
+
+  const officialBreakdown = buildOfficialBreakdown(source);
 
   return {
     ...request,
