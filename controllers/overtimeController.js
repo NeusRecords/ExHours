@@ -107,6 +107,41 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
   };
 }
 
+function getRequestFilters(query = {}) {
+  const filters = [];
+  const params = [];
+
+  if (query.desde && isValidDate(query.desde)) {
+    filters.push(`work_date >= $${params.length + 1}`);
+    params.push(query.desde);
+  }
+
+  if (query.hasta && isValidDate(query.hasta)) {
+    filters.push(`work_date <= $${params.length + 1}`);
+    params.push(query.hasta);
+  }
+
+  if (query.empleado?.trim()) {
+    filters.push(`LOWER(employee_name) LIKE LOWER('%' || $${params.length + 1} || '%')`);
+    params.push(query.empleado.trim());
+  }
+
+  if (query.cedula?.trim()) {
+    filters.push(`cedula = $${params.length + 1}`);
+    params.push(query.cedula.trim());
+  }
+
+  if (query.status) {
+    const normalizedStatus = String(query.status).trim().toUpperCase();
+    if (['PENDIENTE', 'APROBADO', 'RECHAZADO'].includes(normalizedStatus)) {
+      filters.push(`status = $${params.length + 1}`);
+      params.push(normalizedStatus);
+    }
+  }
+
+  return { filters, params };
+}
+
 async function listRequests(req, res, next) {
   try {
     const cedula = req.query.cedula?.trim();
