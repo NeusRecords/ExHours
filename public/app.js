@@ -155,17 +155,28 @@ async function loadEmployees() {
     : '<p class="empty-state">No hay empleados autorizados.</p>';
 }
 
+function safeBreakdownValue(record, keys, fallback = 0) {
+  if (!record || typeof record !== 'object') return fallback;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) {
+      const value = Number(record[key]);
+      if (Number.isFinite(value)) return value;
+    }
+  }
+  return fallback;
+}
+
 function getScheduleBreakdown(request) {
   const req = request || {};
   const b = req.breakdown || req;
-  const totalH = parseFloat(req.total_horas || req.totalHours || 0);
-  const hf = parseFloat(b.hf || b.ordinaryDominicalHours || b.ordinary_dominical_hours || (req.is_sunday || req.is_festivo ? Math.min(totalH, 8) : 0));
-  const rnf = parseFloat(b.rnf || b.ordinaryNocturnalHours || b.ordinary_nocturnal_hours || 0);
-  const hefd = parseFloat(b.hefd || b.extraDiurnaDominicalHours || b.extra_diurna_dominical_hours || (req.is_sunday || req.is_festivo ? Math.max(0, totalH - 8) : 0));
-  const hefn = parseFloat(b.hefn || b.extraNocturnaDominicalHours || b.extra_nocturna_dominical_hours || 0);
-  const hed = parseFloat(b.hed || b.extraDiurnaHours || b.extra_diurna_hours || 0);
-  const hen = parseFloat(b.hen || b.extraNocturnaHours || b.extra_nocturna_hours || 0);
-  const rn = parseFloat(b.rn || b.recargoNocturnoHours || b.recargo_nocturno_hours || 0);
+  const totalH = Number(req.total_horas ?? req.totalHours ?? 0);
+  const hf = safeBreakdownValue(b, ['hf', 'ordinaryDominicalHours', 'ordinary_dominical_hours'], req.is_sunday || req.is_festivo ? Math.min(totalH, 8) : 0);
+  const rnf = safeBreakdownValue(b, ['rnf', 'ordinaryNocturnalHours', 'ordinary_nocturnal_hours'], 0);
+  const hefd = safeBreakdownValue(b, ['hefd', 'extraDiurnaDominicalHours', 'extra_diurna_dominical_hours'], req.is_sunday || req.is_festivo ? Math.max(0, totalH - 8) : 0);
+  const hefn = safeBreakdownValue(b, ['hefn', 'extraNocturnaDominicalHours', 'extra_nocturna_dominical_hours'], 0);
+  const hed = safeBreakdownValue(b, ['hed', 'extraDiurnaHours', 'extra_diurna_hours'], 0);
+  const hen = safeBreakdownValue(b, ['hen', 'extraNocturnaHours', 'extra_nocturna_hours'], 0);
+  const rn = safeBreakdownValue(b, ['rn', 'recargoNocturnoHours', 'recargo_nocturno_hours'], 0);
 
   return `Total: ${totalH.toFixed(2)} h · HF: ${hf.toFixed(2)} h · RNF: ${rnf.toFixed(2)} h · HEFD: ${hefd.toFixed(2)} h · HEFN: ${hefn.toFixed(2)} h · HED: ${hed.toFixed(2)} h · HEN: ${hen.toFixed(2)} h · RN: ${rn.toFixed(2)} h`;
 }
@@ -173,14 +184,14 @@ function getScheduleBreakdown(request) {
 function renderEmployeeRequest(request) {
   const req = request || {};
   const b = req.breakdown || req;
-  const totalH = parseFloat(req.total_horas || req.totalHours || 0);
-  const hf = parseFloat(b.hf || b.ordinaryDominicalHours || b.ordinary_dominical_hours || (req.is_sunday || req.is_festivo ? Math.min(totalH, 8) : 0));
-  const rnf = parseFloat(b.rnf || b.ordinaryNocturnalHours || b.ordinary_nocturnal_hours || 0);
-  const hefd = parseFloat(b.hefd || b.extraDiurnaDominicalHours || b.extra_diurna_dominical_hours || (req.is_sunday || req.is_festivo ? Math.max(0, totalH - 8) : 0));
-  const hefn = parseFloat(b.hefn || b.extraNocturnaDominicalHours || b.extra_nocturna_dominical_hours || 0);
-  const hed = parseFloat(b.hed || b.extraDiurnaHours || b.extra_diurna_hours || 0);
-  const hen = parseFloat(b.hen || b.extraNocturnaHours || b.extra_nocturna_hours || 0);
-  const rn = parseFloat(b.rn || b.recargoNocturnoHours || b.recargo_nocturno_hours || 0);
+  const totalH = Number(req.total_horas ?? req.totalHours ?? 0);
+  const hf = safeBreakdownValue(b, ['hf', 'ordinaryDominicalHours', 'ordinary_dominical_hours'], req.is_sunday || req.is_festivo ? Math.min(totalH, 8) : 0);
+  const rnf = safeBreakdownValue(b, ['rnf', 'ordinaryNocturnalHours', 'ordinary_nocturnal_hours'], 0);
+  const hefd = safeBreakdownValue(b, ['hefd', 'extraDiurnaDominicalHours', 'extra_diurna_dominical_hours'], req.is_sunday || req.is_festivo ? Math.max(0, totalH - 8) : 0);
+  const hefn = safeBreakdownValue(b, ['hefn', 'extraNocturnaDominicalHours', 'extra_nocturna_dominical_hours'], 0);
+  const hed = safeBreakdownValue(b, ['hed', 'extraDiurnaHours', 'extra_diurna_hours'], 0);
+  const hen = safeBreakdownValue(b, ['hen', 'extraNocturnaHours', 'extra_nocturna_hours'], 0);
+  const rn = safeBreakdownValue(b, ['rn', 'recargoNocturnoHours', 'recargo_nocturno_hours'], 0);
   const porcentajeRecargo = Number(req.porcentaje_recargo ?? req.porcentajeRecargo ?? b.porcentajeRecargo ?? b.porcentaje_recargo ?? 0);
   const tipoHora = req.tipo_hora || req.tipoHora || b.tipoHora || b.tipo_hora || 'Sin clasificar';
 
@@ -196,14 +207,14 @@ function renderPendingRequest(request) {
   requestCache.set(String(request.id), request);
   const req = request || {};
   const b = req.breakdown || req;
-  const totalH = parseFloat(req.total_horas || req.totalHours || 0);
-  const hf = parseFloat(b.hf || b.ordinaryDominicalHours || b.ordinary_dominical_hours || (req.is_sunday || req.is_festivo ? Math.min(totalH, 8) : 0));
-  const rnf = parseFloat(b.rnf || b.ordinaryNocturnalHours || b.ordinary_nocturnal_hours || 0);
-  const hefd = parseFloat(b.hefd || b.extraDiurnaDominicalHours || b.extra_diurna_dominical_hours || (req.is_sunday || req.is_festivo ? Math.max(0, totalH - 8) : 0));
-  const hefn = parseFloat(b.hefn || b.extraNocturnaDominicalHours || b.extra_nocturna_dominical_hours || 0);
-  const hed = parseFloat(b.hed || b.extraDiurnaHours || b.extra_diurna_hours || 0);
-  const hen = parseFloat(b.hen || b.extraNocturnaHours || b.extra_nocturna_hours || 0);
-  const rn = parseFloat(b.rn || b.recargoNocturnoHours || b.recargo_nocturno_hours || 0);
+  const totalH = Number(req.total_horas ?? req.totalHours ?? 0);
+  const hf = safeBreakdownValue(b, ['hf', 'ordinaryDominicalHours', 'ordinary_dominical_hours'], req.is_sunday || req.is_festivo ? Math.min(totalH, 8) : 0);
+  const rnf = safeBreakdownValue(b, ['rnf', 'ordinaryNocturnalHours', 'ordinary_nocturnal_hours'], 0);
+  const hefd = safeBreakdownValue(b, ['hefd', 'extraDiurnaDominicalHours', 'extra_diurna_dominical_hours'], req.is_sunday || req.is_festivo ? Math.max(0, totalH - 8) : 0);
+  const hefn = safeBreakdownValue(b, ['hefn', 'extraNocturnaDominicalHours', 'extra_nocturna_dominical_hours'], 0);
+  const hed = safeBreakdownValue(b, ['hed', 'extraDiurnaHours', 'extra_diurna_hours'], 0);
+  const hen = safeBreakdownValue(b, ['hen', 'extraNocturnaHours', 'extra_nocturna_hours'], 0);
+  const rn = safeBreakdownValue(b, ['rn', 'recargoNocturnoHours', 'recargo_nocturno_hours'], 0);
   const porcentajeRecargo = Number(req.porcentaje_recargo ?? req.porcentajeRecargo ?? b.porcentajeRecargo ?? b.porcentaje_recargo ?? 0);
   const tipoHora = req.tipo_hora || req.tipoHora || b.tipoHora || b.tipo_hora || 'Sin clasificar';
 

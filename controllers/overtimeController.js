@@ -371,37 +371,29 @@ async function exportApprovedRequests(req, res, next) {
     );
 
     const rowsForExcel = requests.map((request) => {
-      const b = classifySchedule(
-        request.work_date || request.fecha,
-        request.hora_inicio || request.horaInicio,
-        request.hora_fin || request.horaFin,
-        request.cedula
-      ) || {
-        hed: 0,
-        hen: 0,
-        rn: 0,
-        rnf: 0,
-        hf: 0,
-        hefd: 0,
-        hefn: 0,
+      const normalizedRequest = normalizeRequestBreakdown(request);
+      const breakdown = normalizedRequest.breakdown || normalizedRequest;
+      const safeNumber = (value) => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
       };
 
       return {
         'Cédula': request.cedula || '',
         'Nombre Completo': request.nombre_completo || request.employee_name || request.nombre || '',
-        'Fecha': request.work_date ? new Date(request.work_date).toISOString().split('T')[0] : '',
+        'Fecha': normalizeWorkDate(request.work_date || request.fecha || '') || '',
         'Hora Inicio': request.hora_inicio || '',
         'Hora Fin': request.hora_fin || '',
-        'Total Horas': parseFloat(request.total_horas || request.totalHours || 0),
+        'Total Horas': safeNumber(request.total_horas ?? request.totalHours ?? breakdown.totalHours ?? 0),
         'Motivo': request.motivo || request.reason || '',
         'Estado': request.status || 'APROBADA',
-        'HED': parseFloat(b.hed || 0),
-        'HEN': parseFloat(b.hen || 0),
-        'RN': parseFloat(b.rn || 0),
-        'RNF': parseFloat(b.rnf || 0),
-        'HF': parseFloat(b.hf || 0),
-        'HEFD': parseFloat(b.hefd || 0),
-        'HEFN': parseFloat(b.hefn || 0),
+        'HED': safeNumber(breakdown.hed ?? 0),
+        'HEN': safeNumber(breakdown.hen ?? 0),
+        'RN': safeNumber(breakdown.rn ?? 0),
+        'RNF': safeNumber(breakdown.rnf ?? 0),
+        'HF': safeNumber(breakdown.hf ?? 0),
+        'HEFD': safeNumber(breakdown.hefd ?? 0),
+        'HEFN': safeNumber(breakdown.hefn ?? 0),
       };
     });
 
