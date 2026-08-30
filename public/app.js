@@ -156,17 +156,17 @@ async function loadEmployees() {
 }
 
 function getScheduleBreakdown(request) {
-  const ordinaryDominicalHours = Number(request.ordinaryDominicalHours ?? request.ordinary_dominical_hours ?? request.ordinary_dominical ?? 0);
-  const ordinaryNocturnalHours = Number(request.ordinaryNocturnalHours ?? request.ordinary_nocturnal_hours ?? 0);
-  const extraDiurnaDominicalHours = Number(request.extraDiurnaDominicalHours ?? request.extra_diurna_dominical_hours ?? 0);
-  const extraNocturnaDominicalHours = Number(request.extraNocturnaDominicalHours ?? request.extra_nocturna_dominical_hours ?? 0);
-  const totalHours = Number(request.total_horas ?? request.hours ?? 0);
+  const ordinaryDominical = parseFloat(request.ordinary_dominical_hours ?? request.ordinaryDominicalHours ?? request.ordinary_diurnal_hours ?? 0);
+  const ordinaryNocturnal = parseFloat(request.ordinary_nocturnal_hours ?? request.ordinaryNocturnalHours ?? 0);
+  const extraDiurnaDom = parseFloat(request.extra_diurna_dominical_hours ?? request.extraDiurnaDominicalHours ?? 0);
+  const extraNocturnaDom = parseFloat(request.extra_nocturna_dominical_hours ?? request.extraNocturnaDominicalHours ?? 0);
+  const totalH = parseFloat(request.total_horas ?? request.totalHours ?? request.hours ?? 0);
 
-  if (request.es_festivo || ordinaryDominicalHours > 0 || extraDiurnaDominicalHours > 0 || extraNocturnaDominicalHours > 0) {
-    const ordinaryText = `Total: ${totalHours || Number((ordinaryDominicalHours + extraDiurnaDominicalHours + extraNocturnaDominicalHours).toFixed(2))} h · Ordinaria Dominical: ${ordinaryDominicalHours.toFixed(2)} h${ordinaryNocturnalHours > 0 ? `, recargo dominical (${ordinaryNocturnalHours.toFixed(2)} h)` : ''}`;
+  if (request.es_festivo || ordinaryDominical > 0 || extraDiurnaDom > 0 || extraNocturnaDom > 0) {
+    const ordinaryText = `Total: ${totalH.toFixed(2)} h · Ordinaria Dominical: ${ordinaryDominical.toFixed(2)} h, recargo dominical (${ordinaryNocturnal.toFixed(2)} h)`;
     const extras = [];
-    if (extraDiurnaDominicalHours > 0) extras.push(`${extraDiurnaDominicalHours.toFixed(2)} h (Diurna 116.25%)`);
-    if (extraNocturnaDominicalHours > 0) extras.push(`${extraNocturnaDominicalHours.toFixed(2)} h (Nocturna 168.75%)`);
+    if (extraDiurnaDom > 0) extras.push(`${extraDiurnaDom.toFixed(2)} h (Diurna 116.25%)`);
+    if (extraNocturnaDom > 0) extras.push(`${extraNocturnaDom.toFixed(2)} h (Nocturna 168.75%)`);
     const extraText = extras.length ? `Extras Dominicales: ${extras.join(' · ')}` : '';
     return extraText ? `${ordinaryText} · ${extraText}` : ordinaryText;
   }
@@ -180,7 +180,7 @@ function renderEmployeeRequest(request) {
   const workDate = formatDateValue(request.work_date);
   const surcharge = formatPercentage(request.porcentaje_recargo);
   const scheduleBreakdown = getScheduleBreakdown(request);
-  return `<article class="request"><div><p class="request-title">${escapeHtml(workDate)} · ${request.total_horas ?? request.hours} h ${holidayBadge}</p><p class="request-meta">${escapeHtml(request.hora_inicio || '--:--')} - ${escapeHtml(request.hora_fin || '--:--')} · ${escapeHtml(scheduleBreakdown)}</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(request.tipo_hora || 'Sin clasificar')}</strong> · ${surcharge}</p><p class="request-reason">${escapeHtml(request.reason)}</p>${request.review_comment ? `<p class="review-comment"><strong>Comentario del supervisor:</strong> ${escapeHtml(request.review_comment)}</p>` : ''}${evidence}</div><span class="badge ${request.status.toLowerCase()}">${statusLabels[request.status]}</span></article>`;
+  return `<article class="request"><div><p class="request-title">${escapeHtml(workDate)} · ${escapeHtml(String(request.total_horas ?? request.totalHours ?? request.hours ?? 0))} h ${holidayBadge}</p><p class="request-meta">${escapeHtml(request.hora_inicio || '--:--')} - ${escapeHtml(request.hora_fin || '--:--')} · ${escapeHtml(scheduleBreakdown)}</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(request.tipo_hora || 'Sin clasificar')}</strong> · ${surcharge}</p><p class="request-reason">${escapeHtml(request.reason)}</p>${request.review_comment ? `<p class="review-comment"><strong>Comentario del supervisor:</strong> ${escapeHtml(request.review_comment)}</p>` : ''}${evidence}</div><span class="badge ${request.status.toLowerCase()}">${statusLabels[request.status]}</span></article>`;
 }
 
 function renderPendingRequest(request) {
