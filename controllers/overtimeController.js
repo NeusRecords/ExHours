@@ -67,10 +67,10 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
 
   if (isHolidayOrSunday) {
     const ordinaryLimitMinutes = 8 * 60;
-    let ordinaryDayMinutes = 0;
-    let ordinaryNightMinutes = 0;
-    let extraDayMinutes = 0;
-    let extraNightMinutes = 0;
+    let ordinaryDiurnalMinutes = 0;
+    let ordinaryNocturnalMinutes = 0;
+    let extraDiurnalMinutes = 0;
+    let extraNocturnalMinutes = 0;
     let remaining = durationMinutes;
     let cursor = start;
     let ordinaryUsed = 0;
@@ -86,18 +86,18 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
 
       if (ordinaryPortion > 0) {
         if (isNightSegment) {
-          ordinaryNightMinutes += ordinaryPortion;
+          ordinaryNocturnalMinutes += ordinaryPortion;
         } else {
-          ordinaryDayMinutes += ordinaryPortion;
+          ordinaryDiurnalMinutes += ordinaryPortion;
         }
         ordinaryUsed += ordinaryPortion;
       }
 
       if (extraPortion > 0) {
         if (isNightSegment) {
-          extraNightMinutes += extraPortion;
+          extraNocturnalMinutes += extraPortion;
         } else {
-          extraDayMinutes += extraPortion;
+          extraDiurnalMinutes += extraPortion;
         }
       }
 
@@ -105,32 +105,31 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
       remaining -= segmentMinutes;
     }
 
-    const ordinaryTotalMinutes = ordinaryDayMinutes + ordinaryNightMinutes;
-    const extraTotalMinutes = extraDayMinutes + extraNightMinutes;
+    const ordinaryTotalMinutes = ordinaryDiurnalMinutes + ordinaryNocturnalMinutes;
+    const extraTotalMinutes = extraDiurnalMinutes + extraNocturnalMinutes;
     const ordinaryTotalHours = Number((ordinaryTotalMinutes / 60).toFixed(2));
-    const extraDayHours = Number((extraDayMinutes / 60).toFixed(2));
-    const extraNightHours = Number((extraNightMinutes / 60).toFixed(2));
-    const totalDiurnalMinutes = ordinaryDayMinutes + extraDayMinutes;
-    const totalNocturnalMinutes = ordinaryNightMinutes + extraNightMinutes;
+    const ordinaryDiurnalHours = Number((ordinaryDiurnalMinutes / 60).toFixed(2));
+    const ordinaryNocturnalHours = Number((ordinaryNocturnalMinutes / 60).toFixed(2));
+    const extraDiurnalHours = Number((extraDiurnalMinutes / 60).toFixed(2));
+    const extraNocturnalHours = Number((extraNocturnalMinutes / 60).toFixed(2));
+    const totalDiurnalMinutes = ordinaryDiurnalMinutes + extraDiurnalMinutes;
+    const totalNocturnalMinutes = ordinaryNocturnalMinutes + extraNocturnalMinutes;
     const diurnalHours = Number((totalDiurnalMinutes / 60).toFixed(2));
     const nocturnalHours = Number((totalNocturnalMinutes / 60).toFixed(2));
-    const ordinaryBaseRate = ordinaryNightMinutes > 0 ? 125 : 90;
-    const extraDiurnalRate = extraDayMinutes > 0 ? 116.25 : 0;
-    const extraNocturnalRate = extraNightMinutes > 0 ? 168.75 : 0;
-    const weightedRate = durationMinutes > 0
-      ? Number((((ordinaryDayMinutes * 90) + (ordinaryNightMinutes * 125) + (extraDayMinutes * 116.25) + (extraNightMinutes * 168.75)) / durationMinutes).toFixed(2))
+    const ordinaryBasePercent = 90;
+    const ordinaryNocturnalPercent = 35;
+    const extraDiurnalPercent = 116.25;
+    const extraNocturnalPercent = 168.75;
+    const weightedPercent = durationMinutes > 0
+      ? Number((((ordinaryDiurnalMinutes * ordinaryBasePercent) + (ordinaryNocturnalMinutes * (ordinaryBasePercent + ordinaryNocturnalPercent)) + (extraDiurnalMinutes * extraDiurnalPercent) + (extraNocturnalMinutes * extraNocturnalPercent)) / durationMinutes).toFixed(2))
       : 0;
 
     let type = 'Jornada Ordinaria Dominical';
-    let detail = `Jornada Ordinaria Dominical (${ordinaryTotalHours}h, recargo base 90%`;
-
-    if (ordinaryNightMinutes > 0) {
-      detail += ` + recargo nocturno 35%`;
-    }
+    let detail = `Jornada Ordinaria Dominical: ${ordinaryDiurnalHours.toFixed(2)}h Diurnas (90%), ${ordinaryNocturnalHours.toFixed(2)}h Nocturnas (90% + 35% nocturno)`;
 
     if (extraTotalMinutes > 0) {
       type = 'Jornada Ordinaria Dominical + Horas Extras Dominicales';
-      detail += `); Extra Diurna Dominical (${extraDayHours}h, 116.25%), Extra Nocturna Dominical (${extraNightHours}h, 168.75%)`;
+      detail += `). Horas Extras Dominicales: ${extraDiurnalHours.toFixed(2)}h Extra Diurna Dominical (116.25%), ${extraNocturnalHours.toFixed(2)}h Extra Nocturna Dominical (168.75%)`;
     } else {
       detail += ')';
     }
@@ -140,14 +139,17 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
       diurnalHours,
       nocturnalHours,
       ordinaryDominicalHours: ordinaryTotalHours,
-      extraDiurnaDominicalHours: extraDayHours,
-      extraNocturnaDominicalHours: extraNightHours,
-      ordinaryDominicalSurcharge: ordinaryTotalMinutes > 0 ? ordinaryBaseRate : 0,
-      extraDiurnaDominicalSurcharge: extraDiurnalRate,
-      extraNocturnaDominicalSurcharge: extraNocturnalRate,
+      ordinaryDiurnalHours,
+      ordinaryNocturnalHours,
+      extraDiurnaDominicalHours: extraDiurnalHours,
+      extraNocturnaDominicalHours: extraNocturnalHours,
+      ordinaryDominicalBasePercent: ordinaryBasePercent,
+      ordinaryNocturnalSurchargePercent: ordinaryNocturnalPercent,
+      extraDiurnaDominicalPercent: extraDiurnalPercent,
+      extraNocturnaDominicalPercent: extraNocturnalPercent,
       type,
       detail,
-      surcharge: weightedRate,
+      surcharge: weightedPercent,
       isHolidayOrSunday,
     };
   }
@@ -406,4 +408,4 @@ async function deleteRequest(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { listRequests, listPendingRequests, listSupervisorRequests, exportApprovedRequests, createRequest, reviewRequest, updateRequest, deleteRequest, esFestivoODomingo };
+module.exports = { listRequests, listPendingRequests, listSupervisorRequests, exportApprovedRequests, createRequest, reviewRequest, updateRequest, deleteRequest, esFestivoODomingo, classifySchedule };

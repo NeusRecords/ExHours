@@ -155,12 +155,33 @@ async function loadEmployees() {
     : '<p class="empty-state">No hay empleados autorizados.</p>';
 }
 
+function getScheduleBreakdown(request) {
+  if (request.ordinary_dominical_hours || request.ordinary_diurnal_hours || request.ordinary_nocturnal_hours || request.extra_diurna_dominical_hours || request.extra_nocturna_dominical_hours) {
+    const parts = [];
+    if (Number(request.ordinary_diurnal_hours || 0) > 0) {
+      parts.push(`${Number(request.ordinary_diurnal_hours).toFixed(2)}h Ordinarias Dominicales (Diurna)`);
+    }
+    if (Number(request.ordinary_nocturnal_hours || 0) > 0) {
+      parts.push(`${Number(request.ordinary_nocturnal_hours).toFixed(2)}h Recargo Nocturno`);
+    }
+    if (Number(request.extra_diurna_dominical_hours || 0) > 0) {
+      parts.push(`${Number(request.extra_diurna_dominical_hours).toFixed(2)}h Extras Dominicales Diurnas`);
+    }
+    if (Number(request.extra_nocturna_dominical_hours || 0) > 0) {
+      parts.push(`${Number(request.extra_nocturna_dominical_hours).toFixed(2)}h Extras Dominicales Nocturnas`);
+    }
+    if (parts.length) return parts.join(' · ');
+  }
+  return `${request.horas_diurnas ?? 0}h diurnas · ${request.horas_nocturnas ?? 0}h nocturnas`;
+}
+
 function renderEmployeeRequest(request) {
   const evidence = request.evidencia_url ? `<a class="evidence-link" href="${escapeHtml(request.evidencia_url)}" target="_blank" rel="noopener">Ver evidencia</a>` : '';
   const holidayBadge = request.es_festivo ? '<span class="holiday-badge">Festivo/Domingo</span>' : '';
   const workDate = formatDateValue(request.work_date);
   const surcharge = formatPercentage(request.porcentaje_recargo);
-  return `<article class="request"><div><p class="request-title">${escapeHtml(workDate)} · ${request.total_horas ?? request.hours} h ${holidayBadge}</p><p class="request-meta">${escapeHtml(request.hora_inicio || '--:--')} - ${escapeHtml(request.hora_fin || '--:--')} · ${request.horas_diurnas ?? 0} h diurnas · ${request.horas_nocturnas ?? 0} h nocturnas</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(request.tipo_hora || 'Sin clasificar')}</strong> · ${surcharge}</p><p class="request-reason">${escapeHtml(request.reason)}</p>${request.review_comment ? `<p class="review-comment"><strong>Comentario del supervisor:</strong> ${escapeHtml(request.review_comment)}</p>` : ''}${evidence}</div><span class="badge ${request.status.toLowerCase()}">${statusLabels[request.status]}</span></article>`;
+  const scheduleBreakdown = getScheduleBreakdown(request);
+  return `<article class="request"><div><p class="request-title">${escapeHtml(workDate)} · ${request.total_horas ?? request.hours} h ${holidayBadge}</p><p class="request-meta">${escapeHtml(request.hora_inicio || '--:--')} - ${escapeHtml(request.hora_fin || '--:--')} · ${scheduleBreakdown}</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(request.tipo_hora || 'Sin clasificar')}</strong> · ${surcharge}</p><p class="request-reason">${escapeHtml(request.reason)}</p>${request.review_comment ? `<p class="review-comment"><strong>Comentario del supervisor:</strong> ${escapeHtml(request.review_comment)}</p>` : ''}${evidence}</div><span class="badge ${request.status.toLowerCase()}">${statusLabels[request.status]}</span></article>`;
 }
 
 function renderPendingRequest(request) {
@@ -175,7 +196,8 @@ function renderPendingRequest(request) {
   const holidayBadge = request.es_festivo ? '<span class="holiday-badge">Festivo/Domingo</span>' : '';
   const workDate = formatDateValue(request.work_date);
   const surcharge = formatPercentage(request.porcentaje_recargo);
-  return `<article class="request supervisor-request"><div><p class="request-title">${escapeHtml(request.employee_name)} · ${escapeHtml(workDate)} ${holidayBadge}</p><p class="request-meta">Horario: ${escapeHtml(request.hora_inicio || '--:--')} - ${escapeHtml(request.hora_fin || '--:--')}</p><p class="request-meta">Total: ${request.total_horas ?? request.hours} h · Diurnas: ${request.horas_diurnas ?? 0} h · Nocturnas: ${request.horas_nocturnas ?? 0} h</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(detail)}</strong> · Recargo: <strong>${surcharge}</strong></p><p class="request-reason">${escapeHtml(request.reason)}</p>${evidence}</div><div class="request-actions">${reviewForm}<div class="row-actions"><button class="action-link" data-edit-request="${request.id}" type="button">Editar</button><button class="action-link danger-link" data-delete-request="${request.id}" type="button">Eliminar</button></div></div></article>`;
+  const scheduleBreakdown = getScheduleBreakdown(request);
+  return `<article class="request supervisor-request"><div><p class="request-title">${escapeHtml(request.employee_name)} · ${escapeHtml(workDate)} ${holidayBadge}</p><p class="request-meta">Horario: ${escapeHtml(request.hora_inicio || '--:--')} - ${escapeHtml(request.hora_fin || '--:--')}</p><p class="request-meta">Total: ${request.total_horas ?? request.hours} h · ${scheduleBreakdown}</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(detail)}</strong> · Recargo: <strong>${surcharge}</strong></p><p class="request-reason">${escapeHtml(request.reason)}</p>${evidence}</div><div class="request-actions">${reviewForm}<div class="row-actions"><button class="action-link" data-edit-request="${request.id}" type="button">Editar</button><button class="action-link danger-link" data-delete-request="${request.id}" type="button">Eliminar</button></div></div></article>`;
 }
 
 function openRequestEditor(id) {
