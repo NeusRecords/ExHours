@@ -25,6 +25,8 @@ const employeeEditMessage = document.querySelector('#employee-edit-message');
 const requestCache = new Map();
 const employeeCache = new Map();
 const statusLabels = { PENDIENTE: 'Pendiente', APROBADO: 'Aprobada', RECHAZADO: 'Rechazada' };
+const pageSize = 10;
+const requestPages = { employee: 1, supervisor: 1 };
 
 function supervisorHeaders() {
   const token = sessionStorage.getItem('supervisor_token');
@@ -66,6 +68,35 @@ async function fetchRequests(url) {
   return response.json();
 }
 
+function renderPaginatedRequests(container, requests, renderer, pageKey) {
+  const totalPages = Math.max(1, Math.ceil(requests.length / pageSize));
+  const page = Math.min(requestPages[pageKey], totalPages);
+  requestPages[pageKey] = page;
+  const start = (page - 1) * pageSize;
+  const pageRequests = requests.slice(start, page * pageSize);
+  const emptyMessage = pageKey === 'employee'
+    ? 'No tienes solicitudes registradas.'
+    : 'No se encontraron solicitudes para el rango seleccionado.';
+
+  container.innerHTML = pageRequests.length
+    ? pageRequests.map(renderer).join('')
+    : `<p class="empty-state">${emptyMessage}</p>`;
+
+  if (requests.length <= pageSize) return;
+  const pagination = document.createElement('nav');
+  pagination.className = 'pagination';
+  pagination.setAttribute('aria-label', 'Paginación de solicitudes');
+  pagination.innerHTML = `<button type="button" class="pagination-button" data-page="${page - 1}" ${page === 1 ? 'disabled' : ''}>Anterior</button>${Array.from({ length: totalPages }, (_, index) => { const pageNumber = index + 1; return `<button type="button" class="pagination-button ${pageNumber === page ? 'active' : ''}" data-page="${pageNumber}" aria-current="${pageNumber === page ? 'page' : 'false'}">${pageNumber}</button>`; }).join('')}<button type="button" class="pagination-button" data-page="${page + 1}" ${page === totalPages ? 'disabled' : ''}>Siguiente</button>`;
+  pagination.querySelectorAll('button:not([disabled])').forEach((button) => {
+    button.addEventListener('click', () => {
+      requestPages[pageKey] = Number(button.dataset.page);
+      renderPaginatedRequests(container, requests, renderer, pageKey);
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+  container.appendChild(pagination);
+}
+
 async function loadEmployeeHistory(cedulaOverride = null) {
   const cedula = (cedulaOverride ?? form.elements.cedula.value).trim();
   if (!cedula) {
@@ -73,7 +104,8 @@ async function loadEmployeeHistory(cedulaOverride = null) {
     return;
   }
   const requests = await fetchRequests(`/api/overtime?cedula=${encodeURIComponent(cedula)}`);
-  employeeList.innerHTML = requests.length ? requests.map(renderEmployeeRequest).join('') : '<p class="empty-state">No tienes solicitudes registradas.</p>';
+  requestPages.employee = 1;
+  renderPaginatedRequests(employeeList, requests, renderEmployeeRequest, 'employee');
 }
 
 async function validateEmployee(sourceForm = form, messageTarget = message) {
@@ -143,7 +175,8 @@ async function loadPendingRequests({ announce = false } = {}) {
   const statusMap = { APROBADA: 'APROBADO', RECHAZADA: 'RECHAZADO' };
   const selectedStatus = statusMap[activeSupervisorStatus] || activeSupervisorStatus;
   const filteredRequests = requests.filter((request) => request.status === selectedStatus);
-  pendingList.innerHTML = filteredRequests.length ? filteredRequests.map(renderPendingRequest).join('') : '<p class="empty-state">No se encontraron solicitudes para el rango seleccionado.</p>';
+  requestPages.supervisor = 1;
+  renderPaginatedRequests(pendingList, filteredRequests, renderPendingRequest, 'supervisor');
   if (announce) showFilterStatus(filteredRequests.length);
 }
 
