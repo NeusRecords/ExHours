@@ -1,10 +1,7 @@
 const crypto = require('crypto');
-const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
-
-const uploadDirectory = path.join(__dirname, '..', 'public', 'uploads');
-fs.mkdirSync(uploadDirectory, { recursive: true });
+const { uploadDirectory } = require('../config/storage');
 
 const allowedTypes = new Map([
   ['.jpg', 'image/jpeg'],

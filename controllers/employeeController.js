@@ -7,13 +7,13 @@ async function createEmployee(req, res, next) {
   if (!cedula || !nombreCompleto) return res.status(400).json({ error: 'Cédula y nombre completo son obligatorios' });
   try {
     const result = await database.runAsync(
-      'INSERT INTO employees (cedula, nombre_completo, supervisor_nombre) VALUES (?, ?, ?)',
+      'INSERT INTO employees (cedula, nombre_completo, supervisor_nombre) VALUES ($1, $2, $3) RETURNING id',
       [cedula, nombreCompleto, supervisorNombre]
     );
-    const [employee] = await database.allAsync('SELECT * FROM employees WHERE id = ?', [result.lastID]);
+    const [employee] = await database.allAsync('SELECT * FROM employees WHERE id = $1', [result.lastID]);
     res.status(201).json(employee);
   } catch (error) {
-    if (error.code === 'SQLITE_CONSTRAINT') return res.status(409).json({ error: 'La cédula ya está registrada' });
+    if (error.code === '23505') return res.status(409).json({ error: 'La cédula ya está registrada' });
     next(error);
   }
 }
@@ -25,21 +25,21 @@ async function updateEmployee(req, res, next) {
   if (!cedula || !nombreCompleto) return res.status(400).json({ error: 'Cédula y nombre completo son obligatorios' });
   try {
     const result = await database.runAsync(
-      'UPDATE employees SET cedula = ?, nombre_completo = ?, supervisor_nombre = ? WHERE id = ?',
+      'UPDATE employees SET cedula = $1, nombre_completo = $2, supervisor_nombre = $3 WHERE id = $4',
       [cedula, nombreCompleto, supervisorNombre, req.params.id]
     );
     if (!result.changes) return res.status(404).json({ error: 'Empleado no encontrado' });
-    const [employee] = await database.allAsync('SELECT * FROM employees WHERE id = ?', [req.params.id]);
+    const [employee] = await database.allAsync('SELECT * FROM employees WHERE id = $1', [req.params.id]);
     res.json(employee);
   } catch (error) {
-    if (error.code === 'SQLITE_CONSTRAINT') return res.status(409).json({ error: 'La cédula ya está registrada' });
+    if (error.code === '23505') return res.status(409).json({ error: 'La cédula ya está registrada' });
     next(error);
   }
 }
 
 async function deleteEmployee(req, res, next) {
   try {
-    const result = await database.runAsync('DELETE FROM employees WHERE id = ?', [req.params.id]);
+    const result = await database.runAsync('DELETE FROM employees WHERE id = $1', [req.params.id]);
     if (!result.changes) return res.status(404).json({ error: 'Empleado no encontrado' });
     res.status(204).send();
   } catch (error) { next(error); }
@@ -55,7 +55,7 @@ async function searchEmployee(req, res, next) {
   const cedula = req.query.cc?.trim();
   if (!cedula) return res.status(400).json({ error: 'La cédula es obligatoria' });
   try {
-    const [employee] = await database.allAsync('SELECT id, cedula, nombre_completo FROM employees WHERE cedula = ?', [cedula]);
+    const [employee] = await database.allAsync('SELECT id, cedula, nombre_completo FROM employees WHERE cedula = $1', [cedula]);
     if (!employee) return res.status(404).json({ error: 'La cédula no está registrada en el sistema. Solicite registro a su supervisor.' });
     res.json(employee);
   } catch (error) { next(error); }

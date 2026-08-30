@@ -68,9 +68,9 @@ function classifySchedule(workDate, startTime, endTime) {
   let cursor = start;
   while (remaining > 0) {
     const minuteOfDay = cursor % 1440;
-    const isNight = minuteOfDay >= 19 * 60 || minuteOfDay < 6 * 60;
-    const nextBoundary = isNight ? (minuteOfDay < 6 * 60 ? 6 * 60 : 1440) : 19 * 60;
-    const segmentMinutes = Math.min(remaining, nextBoundary - minuteOfDay);
+      const query = cedula
+        ? 'SELECT * FROM overtime_requests WHERE cedula = $1 ORDER BY work_date DESC, created_at DESC'
+        : 'SELECT * FROM overtime_requests ORDER BY work_date DESC, created_at DESC';
     segments.push({ minutes: segmentMinutes, isNight });
     cursor += segmentMinutes;
     remaining -= segmentMinutes;
@@ -93,21 +93,16 @@ function classifySchedule(workDate, startTime, endTime) {
     ? (isDominicalOrHoliday ? 150 : 75)
     : (isDominicalOrHoliday ? 100 : 25);
   return { totalHours: Number((durationMinutes / 60).toFixed(2)), diurnalHours, nocturnalHours, type, detail, surcharge, isHolidayOrSunday };
-}
-
-function getRequestFilters(query) {
-  const filters = [];
-  const params = [];
   if (query.desde && isValidDate(query.desde)) {
-    filters.push('work_date >= ?');
+    filters.push(`work_date >= $${params.length + 1}`);
     params.push(query.desde);
   }
   if (query.hasta && isValidDate(query.hasta)) {
-    filters.push('work_date <= ?');
+    filters.push(`work_date <= $${params.length + 1}`);
     params.push(query.hasta);
   }
   if (query.empleado?.trim()) {
-    filters.push("LOWER(employee_name) LIKE LOWER('%' || ? || '%')");
+    filters.push(`LOWER(employee_name) LIKE LOWER('%' || $${params.length + 1} || '%')`);
     params.push(query.empleado.trim());
   }
   return { filters, params };
@@ -117,7 +112,7 @@ async function listRequests(req, res, next) {
   try {
     const cedula = req.query.cedula?.trim();
     const query = cedula
-      ? 'SELECT * FROM overtime_requests WHERE cedula = ? ORDER BY work_date DESC, created_at DESC'
+      ? 'SELECT * FROM overtime_requests WHERE cedula = $1 ORDER BY work_date DESC, created_at DESC'
       : 'SELECT * FROM overtime_requests ORDER BY work_date DESC, created_at DESC';
     const params = cedula ? [cedula] : [];
     const requests = await database.allAsync(
@@ -219,14 +214,15 @@ async function createRequest(req, res, next) {
   }
 
   try {
-    const [employee] = await database.allAsync('SELECT nombre_completo FROM employees WHERE cedula = ?', [cedula.trim()]);
+    const [employee] = await database.allAsync('SELECT nombre_completo FROM employees WHERE cedula = $1', [cedula.trim()]);
     if (!employee) return res.status(403).json({ error: 'La cédula no está registrada en el sistema. Solicite registro a su supervisor.' });
     const result = await database.runAsync(
       `INSERT INTO overtime_requests (employee_name, cedula, work_date, hours, hora_inicio, hora_fin, total_horas, horas_diurnas, horas_nocturnas, tipo_hora, porcentaje_recargo, reason, evidencia_url, es_festivo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [employee.nombre_completo, cedula.trim(), workDate, schedule.totalHours, horaInicio, horaFin, schedule.totalHours, schedule.diurnalHours, schedule.nocturnalHours, schedule.type, schedule.surcharge, reason.trim(), req.file ? `/uploads/${req.file.filename}` : null, schedule.isHolidayOrSunday ? 1 : 0]
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING id`,
+      [employee.nombre_completo, cedula.trim(), workDate, schedule.totalHours, horaInicio, horaFin, schedule.totalHours, schedule.diurnalHours, schedule.nocturnalHours, schedule.type, schedule.surcharge, reason.trim(), req.file ? `/uploads/${req.file.filename}` : null, schedule.isHolidayOrSunday]
     );
-    const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = ?', [result.lastID]);
+    const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = $1', [result.lastID]);
     res.status(201).json(request);
   } catch (error) {
     next(error);
@@ -244,11 +240,11 @@ async function reviewRequest(req, res, next) {
 
   try {
     const result = await database.runAsync(
-      "UPDATE overtime_requests SET status = ?, review_comment = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'PENDIENTE'",
+      "UPDATE overtime_requests SET status = $1, review_comment = $2, reviewed_at = CURRENT_TIMESTAMP WHERE id = $3 AND status = 'PENDIENTE'",
       [status, comment.trim(), req.params.id]
     );
     if (!result.changes) return res.status(404).json({ error: 'Solicitud pendiente no encontrada' });
-    const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = ?', [req.params.id]);
+    const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = $1', [req.params.id]);
     res.json(request);
   } catch (error) {
     next(error);
@@ -257,7 +253,7 @@ async function reviewRequest(req, res, next) {
 
 async function updateRequest(req, res, next) {
   try {
-    const [current] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = ?', [req.params.id]);
+    const [current] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = $1', [req.params.id]);
     if (!current) return res.status(404).json({ error: 'Solicitud no encontrada' });
     const cedula = (req.body?.cedula || current.cedula || '').trim();
     const workDate = req.body?.workDate || current.work_date;
@@ -269,21 +265,21 @@ async function updateRequest(req, res, next) {
     if (!cedula || !schedule || !reason || !['PENDIENTE', 'APROBADO', 'RECHAZADO'].includes(status)) {
       return res.status(400).json({ error: 'Cédula, fecha, horarios, motivo y estado son obligatorios y válidos' });
     }
-    const [employee] = await database.allAsync('SELECT nombre_completo FROM employees WHERE cedula = ?', [cedula]);
+    const [employee] = await database.allAsync('SELECT nombre_completo FROM employees WHERE cedula = $1', [cedula]);
     if (!employee) return res.status(403).json({ error: 'La cédula no está registrada en el sistema' });
     const reviewComment = req.body?.review_comment?.trim() || (status === current.status ? current.review_comment : null);
     await database.runAsync(
-      `UPDATE overtime_requests SET employee_name = ?, cedula = ?, work_date = ?, hours = ?, hora_inicio = ?, hora_fin = ?, total_horas = ?, horas_diurnas = ?, horas_nocturnas = ?, tipo_hora = ?, porcentaje_recargo = ?, reason = ?, status = ?, review_comment = ?, reviewed_at = CASE WHEN ? = 'PENDIENTE' THEN NULL ELSE COALESCE(reviewed_at, CURRENT_TIMESTAMP) END WHERE id = ?`,
+      `UPDATE overtime_requests SET employee_name = $1, cedula = $2, work_date = $3, hours = $4, hora_inicio = $5, hora_fin = $6, total_horas = $7, horas_diurnas = $8, horas_nocturnas = $9, tipo_hora = $10, porcentaje_recargo = $11, reason = $12, status = $13, review_comment = $14, reviewed_at = CASE WHEN $15 = 'PENDIENTE' THEN NULL ELSE COALESCE(reviewed_at, CURRENT_TIMESTAMP) END WHERE id = $16`,
       [employee.nombre_completo, cedula, workDate, schedule.totalHours, horaInicio, horaFin, schedule.totalHours, schedule.diurnalHours, schedule.nocturnalHours, schedule.type, schedule.surcharge, reason, status, reviewComment, status, req.params.id]
     );
-    const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = ?', [req.params.id]);
+    const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = $1', [req.params.id]);
     res.json(request);
   } catch (error) { next(error); }
 }
 
 async function deleteRequest(req, res, next) {
   try {
-    const result = await database.runAsync('DELETE FROM overtime_requests WHERE id = ?', [req.params.id]);
+    const result = await database.runAsync('DELETE FROM overtime_requests WHERE id = $1', [req.params.id]);
     if (!result.changes) return res.status(404).json({ error: 'Solicitud no encontrada' });
     res.status(204).send();
   } catch (error) { next(error); }

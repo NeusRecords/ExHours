@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const { initializeDatabase } = require('./config/database');
+const { persistentStorage, uploadDirectory } = require('./config/storage');
 const overtimeRoutes = require('./routes/overtimeRoutes');
 const authRoutes = require('./routes/authRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
@@ -12,6 +13,7 @@ const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+if (persistentStorage) app.use('/uploads', express.static(uploadDirectory));
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/overtime', overtimeRoutes);
