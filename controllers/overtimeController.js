@@ -94,6 +94,8 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
   const isSunday = Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day) && dateObj.getDay() === 0;
   const isHolidayOrSunday = isSunday || esFestivoODomingo(normalizedDate);
   const toHours = (minutes) => Number((minutes / 60).toFixed(2));
+  const dayStartMinutes = 6 * 60;
+  const nightStartMinutes = 19 * 60;
 
   let hf = 0;
   let rnf = 0;
@@ -113,8 +115,8 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
 
     while (remaining > 0) {
       const minuteOfDay = cursor % 1440;
-      const isNightSegment = minuteOfDay >= 21 * 60 || minuteOfDay < 6 * 60;
-      const nextBoundary = minuteOfDay < 6 * 60 ? 6 * 60 : minuteOfDay < 21 * 60 ? 21 * 60 : 1440;
+      const isNightSegment = minuteOfDay >= nightStartMinutes || minuteOfDay < dayStartMinutes;
+      const nextBoundary = minuteOfDay < dayStartMinutes ? dayStartMinutes : minuteOfDay < nightStartMinutes ? nightStartMinutes : 1440;
       const segmentMinutes = Math.min(remaining, nextBoundary - minuteOfDay);
       const assignedOrdinaryMinutes = Math.min(segmentMinutes, remainingOrdinary);
       const extraMinutes = segmentMinutes - assignedOrdinaryMinutes;
@@ -147,8 +149,8 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
 
     while (remaining > 0) {
       const minuteOfDay = cursor % 1440;
-      const isNightSegment = minuteOfDay >= 21 * 60 || minuteOfDay < 6 * 60;
-      const nextBoundary = minuteOfDay < 6 * 60 ? 6 * 60 : minuteOfDay < 21 * 60 ? 21 * 60 : 1440;
+      const isNightSegment = minuteOfDay >= nightStartMinutes || minuteOfDay < dayStartMinutes;
+      const nextBoundary = minuteOfDay < dayStartMinutes ? dayStartMinutes : minuteOfDay < nightStartMinutes ? nightStartMinutes : 1440;
       const segmentMinutes = Math.min(remaining, nextBoundary - minuteOfDay);
 
       if (isNightSegment) {
