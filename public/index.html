@@ -27,11 +27,7 @@
           <label>Hora de Fin<input name="horaFin" type="time" required></label>
           <label>Motivo<textarea name="reason" rows="4" required maxlength="500" placeholder="Describe el trabajo realizado"></textarea></label>
           <label>Evidencia (opcional)<input id="evidencia" name="evidencia" type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf"></label>
-          <div class="form-actions">
-            <button type="submit">Enviar solicitud <span aria-hidden="true">&#8594;</span></button>
-            <button type="button" id="btnCalcularRN" class="secondary-button" style="margin-left: 8px;">🌙 Calcular RN</button>
-          </div>
-          <div id="resultadoRN" style="display:none; margin-top:10px; padding:10px; background:#f0f4f8; border-radius:6px; font-weight:bold; color:#1e293b;"></div>
+          <button type="submit">Enviar solicitud <span aria-hidden="true">&#8594;</span></button>
           <p id="form-message" class="form-message" role="status"></p>
         </form>
 

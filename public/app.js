@@ -325,35 +325,6 @@ form.elements.cedula.addEventListener('change', () => validateEmployee().catch((
 form.elements.cedula.addEventListener('blur', () => validateEmployee().catch((error) => { message.textContent = error.message; }));
 
 document.querySelector('#employee-refresh').addEventListener('click', () => loadEmployeeHistory().catch((error) => { employeeList.innerHTML = `<p class="empty-state">${error.message}</p>`; }));
-document.querySelector('#btnCalcularRN').addEventListener('click', () => {
-  const startValue = form.elements.horaInicio.value;
-  const endValue = form.elements.horaFin.value;
-  const result = document.querySelector('#resultadoRN');
-
-  if (!startValue || !endValue) {
-    result.textContent = 'Ingresa la hora de inicio y la hora de fin.';
-    result.style.display = 'block';
-    return;
-  }
-
-  const toMinutes = (value) => {
-    const [hours, minutes] = value.split(':').map(Number);
-    return hours * 60 + minutes;
-  };
-  const start = toMinutes(startValue);
-  let end = toMinutes(endValue);
-  if (end <= start) end += 24 * 60;
-
-  let nocturnalMinutes = 0;
-  for (let dayStart = start - (start % (24 * 60)); dayStart < end; dayStart += 24 * 60) {
-    const nightStart = dayStart + 19 * 60;
-    const nightEnd = dayStart + 30 * 60;
-    nocturnalMinutes += Math.max(0, Math.min(end, nightEnd) - Math.max(start, nightStart));
-  }
-
-  result.textContent = `Recargo Nocturno (RN): ${(nocturnalMinutes / 60).toFixed(2)} h`;
-  result.style.display = 'block';
-});
 document.querySelector('#supervisor-refresh').addEventListener('click', () => loadPendingRequests().catch((error) => { pendingList.innerHTML = `<p class="empty-state">${error.message}</p>`; }));
 document.querySelector('#export-csv').addEventListener('click', () => exportApprovedRequests().catch((error) => { message.textContent = error.message; }));
 document.querySelector('#btnExportConsolidated').addEventListener('click', () => exportConsolidatedRequests().catch((error) => { message.textContent = error.message; }));
