@@ -57,6 +57,8 @@ async function initializeDatabase() {
       reviewed_at TIMESTAMP
     )
   `);
+
+  await pool.runAsync('ALTER TABLE overtime_requests ADD COLUMN IF NOT EXISTS rn NUMERIC(5, 2) NOT NULL DEFAULT 0');
 }
 
 module.exports = { database: pool, initializeDatabase };

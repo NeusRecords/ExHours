@@ -18,7 +18,12 @@
 
     <section id="employee-view" class="role-view active" aria-labelledby="employee-tab">
       <div class="workspace">
-        <form id="overtime-form" class="panel form-panel" enctype="multipart/form-data">
+        <div class="panel form-panel employee-registration-panel">
+          <div class="employee-form-tabs" role="tablist" aria-label="Tipo de registro">
+            <button type="button" class="employee-tab active" data-form="overtime-form" role="tab" aria-selected="true">⏱️ Horas Extras</button>
+            <button type="button" class="employee-tab" data-form="formRecargoNocturno" role="tab" aria-selected="false">🌙 Recargo Nocturno</button>
+          </div>
+          <form id="overtime-form" enctype="multipart/form-data">
           <div class="panel-heading"><p class="eyebrow">Empleado</p><h2>Registrar horas</h2></div>
           <label>CC / Cédula<input name="cedula" id="employee-cedula" required inputmode="numeric" placeholder="Número de cédula"></label>
           <label>Nombre Completo<input id="employee-name" name="employeeName" readonly placeholder="Se completará al validar la cédula"></label>
@@ -29,7 +34,18 @@
           <label>Evidencia (opcional)<input id="evidencia" name="evidencia" type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf"></label>
           <button type="submit">Enviar solicitud <span aria-hidden="true">&#8594;</span></button>
           <p id="form-message" class="form-message" role="status"></p>
-        </form>
+          </form>
+          <form id="formRecargoNocturno" enctype="multipart/form-data" hidden>
+            <div class="panel-heading"><p class="eyebrow">Empleado</p><h2>Registrar Recargo Nocturno</h2></div>
+            <label>Cédula<input name="cedula" required inputmode="numeric" placeholder="Número de cédula"></label>
+            <label>Nombre Completo<input name="employeeName" readonly placeholder="Se completará al validar la cédula"></label>
+            <label>Fecha del Turno<input name="workDate" type="date" required></label>
+            <label>Hora Entrada Turno<input name="horaInicio" type="time" required></label>
+            <label>Hora Salida Turno<input name="horaFin" type="time" required></label>
+            <button type="submit">Registrar Recargo Nocturno <span aria-hidden="true">&#8594;</span></button>
+            <p id="rn-form-message" class="form-message" role="status"></p>
+          </form>
+        </div>
 
         <section class="panel requests-panel">
           <div class="panel-heading requests-heading"><div><p class="eyebrow">Empleado</p><h2>Mis solicitudes</h2></div><button id="employee-refresh" class="secondary-button" type="button">Actualizar</button></div>

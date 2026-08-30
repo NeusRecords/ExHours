@@ -1,4 +1,7 @@
 const form = document.querySelector('#overtime-form');
+const rnForm = document.querySelector('#formRecargoNocturno');
+const employeeTabs = document.querySelectorAll('.employee-form-tabs .employee-tab');
+const rnMessage = document.querySelector('#rn-form-message');
 const employeeList = document.querySelector('#employee-list');
 const pendingList = document.querySelector('#pending-list');
 const message = document.querySelector('#form-message');
@@ -37,14 +40,34 @@ function activeFilterQuery() {
   return query.toString();
 }
 
+function calculateNightHours(startValue, endValue) {
+  const toMinutes = (value) => {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
+    const [hours, minutes] = value.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  const start = toMinutes(startValue);
+  let end = toMinutes(endValue);
+  if (start == null || end == null) return null;
+  if (end <= start) end += 24 * 60;
+
+  let nocturnalMinutes = 0;
+  for (let dayStart = start - (start % (24 * 60)); dayStart < end; dayStart += 24 * 60) {
+    const nightStart = dayStart + 19 * 60;
+    const nightEnd = dayStart + 30 * 60;
+    nocturnalMinutes += Math.max(0, Math.min(end, nightEnd) - Math.max(start, nightStart));
+  }
+  return Number((nocturnalMinutes / 60).toFixed(2));
+}
+
 async function fetchRequests(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error('No se pudieron cargar las solicitudes');
   return response.json();
 }
 
-async function loadEmployeeHistory() {
-  const cedula = form.elements.cedula.value.trim();
+async function loadEmployeeHistory(cedulaOverride = null) {
+  const cedula = (cedulaOverride ?? form.elements.cedula.value).trim();
   if (!cedula) {
     employeeList.innerHTML = '<p class="empty-state">Escribe tu cédula para consultar tu historial.</p>';
     return;
@@ -325,6 +348,57 @@ form.elements.cedula.addEventListener('change', () => validateEmployee().catch((
 form.elements.cedula.addEventListener('blur', () => validateEmployee().catch((error) => { message.textContent = error.message; }));
 
 document.querySelector('#employee-refresh').addEventListener('click', () => loadEmployeeHistory().catch((error) => { employeeList.innerHTML = `<p class="empty-state">${error.message}</p>`; }));
+employeeTabs.forEach((tab) => {
+  tab.addEventListener('click', () => {
+    employeeTabs.forEach((button) => {
+      const isActive = button === tab;
+      button.classList.toggle('active', isActive);
+      button.setAttribute('aria-selected', String(isActive));
+    });
+    document.querySelectorAll('.employee-registration-panel > form').forEach((registrationForm) => {
+      registrationForm.hidden = registrationForm.id !== tab.dataset.form;
+    });
+  });
+});
+rnForm.elements.cedula.addEventListener('blur', () => validateRnEmployee().catch((error) => { rnMessage.textContent = error.message; }));
+rnForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  rnMessage.textContent = '';
+  const totalHours = calculateNightHours(rnForm.elements.horaInicio.value, rnForm.elements.horaFin.value);
+  if (totalHours == null || totalHours <= 0) {
+    rnMessage.textContent = 'Ingresa horas de turno válidas.';
+    return;
+  }
+  if (!rnForm.elements.employeeName.value) {
+    rnMessage.textContent = 'La cédula no está registrada en el sistema. Solicite registro a su supervisor.';
+    return;
+  }
+
+  const data = new FormData(rnForm);
+  data.set('requestType', 'RN');
+  data.set('rn', totalHours.toFixed(2));
+  ['hed', 'hen', 'rnf', 'hf', 'hefd', 'hefn'].forEach((field) => data.set(field, '0'));
+  try {
+    const response = await fetch('/api/overtime', { method: 'POST', body: data });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error);
+    rnMessage.textContent = `Recargo Nocturno registrado: ${totalHours.toFixed(2)} h.`;
+    await loadEmployeeHistory(rnForm.elements.cedula.value);
+    rnForm.reset();
+  } catch (error) {
+    rnMessage.textContent = error.message;
+  }
+});
+async function validateRnEmployee() {
+  const cedula = rnForm.elements.cedula.value.trim();
+  const nameField = rnForm.elements.employeeName;
+  nameField.value = '';
+  if (!cedula) return;
+  const response = await fetch(`/api/employees/search?cc=${encodeURIComponent(cedula)}`);
+  if (!response.ok) throw new Error('La cédula no está registrada en el sistema. Solicite registro a su supervisor.');
+  const employee = await response.json();
+  nameField.value = employee.nombre_completo;
+}
 document.querySelector('#supervisor-refresh').addEventListener('click', () => loadPendingRequests().catch((error) => { pendingList.innerHTML = `<p class="empty-state">${error.message}</p>`; }));
 document.querySelector('#export-csv').addEventListener('click', () => exportApprovedRequests().catch((error) => { message.textContent = error.message; }));
 document.querySelector('#btnExportConsolidated').addEventListener('click', () => exportConsolidatedRequests().catch((error) => { message.textContent = error.message; }));

@@ -33,6 +33,19 @@ function timeToMinutes(value) {
   return hours * 60 + minutes;
 }
 
+function calculateNightHours(startTime, endTime) {
+  const start = timeToMinutes(startTime);
+  let end = timeToMinutes(endTime);
+  if (start == null || end == null) return null;
+  if (end <= start) end += 24 * 60;
+
+  let nocturnalMinutes = 0;
+  for (let dayStart = start - (start % 1440); dayStart < end; dayStart += 1440) {
+    nocturnalMinutes += Math.max(0, Math.min(end, dayStart + 1800) - Math.max(start, dayStart + 1140));
+  }
+  return Number((nocturnalMinutes / 60).toFixed(2));
+}
+
 function easterSunday(year) {
   const century = Math.floor(year / 100);
   const yearRemainder = year % 19;
@@ -269,7 +282,10 @@ function normalizeRequestBreakdown(request) {
   const endTime = request.hora_fin ?? request.horaFin ?? null;
   const cedula = request.cedula ?? null;
 
-  const schedule = workDate && startTime && endTime && isValidDate(workDate)
+  const isNightSurcharge = request.tipo_hora === 'Recargo Nocturno (RN)';
+  const schedule = isNightSurcharge
+    ? { rn: Number(request.rn ?? 0), totalHours: Number(request.rn ?? 0), nocturnalHours: Number(request.rn ?? 0), tipoHora: 'Recargo Nocturno (RN)' }
+    : workDate && startTime && endTime && isValidDate(workDate)
     ? classifySchedule(workDate, startTime, endTime, cedula)
     : null;
 
@@ -475,9 +491,13 @@ async function exportConsolidatedRequests(req, res, next) {
 
 async function createRequest(req, res, next) {
   const { cedula, workDate, horaInicio, horaFin, reason } = req.body || {};
-  const schedule = isValidDate(workDate) ? classifySchedule(workDate, horaInicio, horaFin, cedula) : null;
+  const isNightSurcharge = req.body?.requestType === 'RN';
+  const nightHours = isNightSurcharge ? calculateNightHours(horaInicio, horaFin) : null;
+  const schedule = isNightSurcharge
+    ? nightHours == null ? null : { rn: nightHours, totalHours: nightHours, nocturnalHours: nightHours, tipoHora: 'Recargo Nocturno (RN)', isHolidayOrSunday: false }
+    : isValidDate(workDate) ? classifySchedule(workDate, horaInicio, horaFin, cedula) : null;
 
-  if (!cedula?.trim() || !isValidDate(workDate) || !schedule || schedule.totalHours <= 0 || schedule.totalHours > 24 || !reason?.trim()) {
+  if (!cedula?.trim() || !isValidDate(workDate) || !schedule || schedule.totalHours <= 0 || schedule.totalHours > 24 || (!isNightSurcharge && !reason?.trim())) {
     return res.status(400).json({ error: 'Cédula, fecha, hora de inicio, hora de fin y motivo son obligatorios y válidos' });
   }
 
@@ -500,10 +520,10 @@ async function createRequest(req, res, next) {
     const porcentajeRecargo = Number(schedule.porcentajeRecargo ?? schedule.porcentaje_recargo ?? schedule.surcharge ?? 0);
 
     const result = await database.runAsync(
-      `INSERT INTO overtime_requests (employee_name, cedula, work_date, hours, hora_inicio, hora_fin, total_horas, horas_diurnas, horas_nocturnas, tipo_hora, porcentaje_recargo, reason, evidencia_url, es_festivo)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `INSERT INTO overtime_requests (employee_name, cedula, work_date, hours, hora_inicio, hora_fin, total_horas, horas_diurnas, horas_nocturnas, tipo_hora, porcentaje_recargo, reason, evidencia_url, es_festivo, rn)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING id`,
-      [employee.nombre_completo, cedula.trim(), workDate, totalHours, horaInicio, horaFin, totalHours, diurnalHours, nocturnalHours, tipoHora, porcentajeRecargo, reason.trim(), req.file ? `/uploads/${req.file.filename}` : null, schedule.isHolidayOrSunday]
+      [employee.nombre_completo, cedula.trim(), workDate, totalHours, horaInicio, horaFin, totalHours, diurnalHours, nocturnalHours, tipoHora, porcentajeRecargo, reason?.trim() || 'Recargo Nocturno', req.file ? `/uploads/${req.file.filename}` : null, schedule.isHolidayOrSunday, isNightSurcharge ? nightHours : 0]
     );
     const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = $1', [result.lastID]);
     res.status(201).json(normalizeRequestBreakdown(request));
