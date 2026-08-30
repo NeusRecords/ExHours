@@ -40,7 +40,7 @@ function calculateNightHours(startTime, endTime) {
   if (end <= start) end += 24 * 60;
 
   let nocturnalMinutes = 0;
-  for (let dayStart = start - (start % 1440); dayStart < end; dayStart += 1440) {
+  for (let dayStart = start - (start % 1440) - 1440; dayStart < end; dayStart += 1440) {
     nocturnalMinutes += Math.max(0, Math.min(end, dayStart + 1800) - Math.max(start, dayStart + 1140));
   }
   return Number((nocturnalMinutes / 60).toFixed(2));

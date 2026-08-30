@@ -40,7 +40,7 @@ function activeFilterQuery() {
   return query.toString();
 }
 
-function calculateNightHours(startValue, endValue) {
+function calculateRN(startValue, endValue) {
   const toMinutes = (value) => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
     const [hours, minutes] = value.split(':').map(Number);
@@ -52,7 +52,7 @@ function calculateNightHours(startValue, endValue) {
   if (end <= start) end += 24 * 60;
 
   let nocturnalMinutes = 0;
-  for (let dayStart = start - (start % (24 * 60)); dayStart < end; dayStart += 24 * 60) {
+  for (let dayStart = start - (start % (24 * 60)) - (24 * 60); dayStart < end; dayStart += 24 * 60) {
     const nightStart = dayStart + 19 * 60;
     const nightEnd = dayStart + 30 * 60;
     nocturnalMinutes += Math.max(0, Math.min(end, nightEnd) - Math.max(start, nightStart));
@@ -364,7 +364,7 @@ rnForm.elements.cedula.addEventListener('blur', () => validateRnEmployee().catch
 rnForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   rnMessage.textContent = '';
-  const totalHours = calculateNightHours(rnForm.elements.horaInicio.value, rnForm.elements.horaFin.value);
+  const totalHours = calculateRN(rnForm.elements.horaInicio.value, rnForm.elements.horaFin.value);
   if (totalHours == null || totalHours <= 0) {
     rnMessage.textContent = 'Ingresa horas de turno válidas.';
     return;
