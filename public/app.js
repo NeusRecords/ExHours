@@ -269,7 +269,12 @@ function escapeHtml(value) {
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const originalText = submitBtn.textContent.trim();
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Guardando...';
   message.textContent = '';
+
   const data = new FormData(form);
   try {
     if (!form.elements.employeeName.value) throw new Error('La cédula no está registrada en el sistema. Solicite registro a su supervisor.');
@@ -283,7 +288,12 @@ form.addEventListener('submit', async (event) => {
     form.elements.horaFin.value = '';
     form.elements.reason.value = '';
     form.elements.evidencia.value = '';
-  } catch (error) { message.textContent = error.message; }
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
+  }
 });
 
 form.elements.cedula.addEventListener('change', () => validateEmployee().catch((error) => { message.textContent = error.message; }));

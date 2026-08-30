@@ -423,6 +423,15 @@ async function createRequest(req, res, next) {
   try {
     const [employee] = await database.allAsync('SELECT nombre_completo FROM employees WHERE cedula = $1', [cedula.trim()]);
     if (!employee) return res.status(403).json({ error: 'La cédula no está registrada en el sistema. Solicite registro a su supervisor.' });
+
+    const duplicate = await database.allAsync(
+      'SELECT id FROM overtime_requests WHERE cedula = $1 AND work_date = $2 AND hora_inicio = $3 LIMIT 1',
+      [cedula.trim(), workDate, horaInicio]
+    );
+    if (duplicate.length > 0) {
+      return res.status(409).json({ error: 'Ya existe una solicitud registrada para este horario.' });
+    }
+
     const totalHours = Number(schedule.totalHours ?? schedule.total_horas ?? 0);
     const diurnalHours = Number(schedule.diurnalHours ?? ((schedule.hed ?? 0) + (schedule.hefd ?? 0) + (schedule.hf ?? 0)));
     const nocturnalHours = Number(schedule.nocturnalHours ?? ((schedule.hen ?? 0) + (schedule.hefn ?? 0) + (schedule.rnf ?? 0) + (schedule.rn ?? 0)));
