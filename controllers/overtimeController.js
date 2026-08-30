@@ -57,31 +57,34 @@ function esFestivoODomingo(fechaStr) {
   return fecha.getUTCDay() === 0 || colombianHolidays(Number(fechaStr.slice(0, 4))).has(fechaStr);
 }
 
-function classifySchedule(workDate, startTime, endTime) {
+function classifySchedule(workDate, startTime, endTime, cedula = null) {
   const start = timeToMinutes(startTime);
   const end = timeToMinutes(endTime);
   if (start === null || end === null || start === end) return null;
+
   const durationMinutes = end > start ? end - start : 1440 - start + end;
   const isHolidayOrSunday = esFestivoODomingo(workDate);
   const segments = [];
   let remaining = durationMinutes;
   let cursor = start;
+
   while (remaining > 0) {
     const minuteOfDay = cursor % 1440;
-      const query = cedula
-        ? 'SELECT * FROM overtime_requests WHERE cedula = $1 ORDER BY work_date DESC, created_at DESC'
-        : 'SELECT * FROM overtime_requests ORDER BY work_date DESC, created_at DESC';
+    const isNight = minuteOfDay >= 22 * 60 || minuteOfDay < 6 * 60;
+    const nextBoundary = isNight ? (minuteOfDay < 6 * 60 ? 6 * 60 : 24 * 60) : 22 * 60;
+    const segmentMinutes = Math.min(remaining, nextBoundary - minuteOfDay);
+
     segments.push({ minutes: segmentMinutes, isNight });
     cursor += segmentMinutes;
     remaining -= segmentMinutes;
   }
+
   const diurnalMinutes = segments.filter((segment) => !segment.isNight).reduce((total, segment) => total + segment.minutes, 0);
   const nocturnalMinutes = segments.filter((segment) => segment.isNight).reduce((total, segment) => total + segment.minutes, 0);
   const diurnalHours = Number((diurnalMinutes / 60).toFixed(2));
   const nocturnalHours = Number((nocturnalMinutes / 60).toFixed(2));
   const isMixed = diurnalMinutes > 0 && nocturnalMinutes > 0;
-  const isDominicalOrHoliday = isHolidayOrSunday;
-  const daySuffix = isDominicalOrHoliday ? ' Dominical / Festiva' : '';
+  const daySuffix = isHolidayOrSunday ? ' Dominical / Festiva' : '';
   const dominantIsNight = nocturnalMinutes > diurnalMinutes;
   const type = isMixed
     ? `Mixta (${diurnalHours}h Diurna / ${nocturnalHours}h Nocturna)`
@@ -90,22 +93,18 @@ function classifySchedule(workDate, startTime, endTime) {
     ? `${diurnalHours}h Extra Diurna${daySuffix}, ${nocturnalHours}h Extra Nocturna${daySuffix}`
     : type;
   const surcharge = dominantIsNight
-    ? (isDominicalOrHoliday ? 150 : 75)
-    : (isDominicalOrHoliday ? 100 : 25);
-  return { totalHours: Number((durationMinutes / 60).toFixed(2)), diurnalHours, nocturnalHours, type, detail, surcharge, isHolidayOrSunday };
-  if (query.desde && isValidDate(query.desde)) {
-    filters.push(`work_date >= $${params.length + 1}`);
-    params.push(query.desde);
-  }
-  if (query.hasta && isValidDate(query.hasta)) {
-    filters.push(`work_date <= $${params.length + 1}`);
-    params.push(query.hasta);
-  }
-  if (query.empleado?.trim()) {
-    filters.push(`LOWER(employee_name) LIKE LOWER('%' || $${params.length + 1} || '%')`);
-    params.push(query.empleado.trim());
-  }
-  return { filters, params };
+    ? (isHolidayOrSunday ? 150 : 75)
+    : (isHolidayOrSunday ? 100 : 25);
+
+  return {
+    totalHours: Number((durationMinutes / 60).toFixed(2)),
+    diurnalHours,
+    nocturnalHours,
+    type,
+    detail,
+    surcharge,
+    isHolidayOrSunday,
+  };
 }
 
 async function listRequests(req, res, next) {
@@ -207,7 +206,7 @@ async function exportApprovedRequests(req, res, next) {
 
 async function createRequest(req, res, next) {
   const { cedula, workDate, horaInicio, horaFin, reason } = req.body || {};
-  const schedule = isValidDate(workDate) ? classifySchedule(workDate, horaInicio, horaFin) : null;
+  const schedule = isValidDate(workDate) ? classifySchedule(workDate, horaInicio, horaFin, cedula) : null;
 
   if (!cedula?.trim() || !isValidDate(workDate) || !schedule || schedule.totalHours <= 0 || schedule.totalHours > 24 || !reason?.trim()) {
     return res.status(400).json({ error: 'Cédula, fecha, hora de inicio, hora de fin y motivo son obligatorios y válidos' });
@@ -261,7 +260,7 @@ async function updateRequest(req, res, next) {
     const horaFin = req.body?.horaFin || current.hora_fin;
     const reason = (req.body?.reason || current.reason).trim();
     const status = req.body?.status || current.status;
-    const schedule = isValidDate(workDate) ? classifySchedule(workDate, horaInicio, horaFin) : null;
+    const schedule = isValidDate(workDate) ? classifySchedule(workDate, horaInicio, horaFin, cedula) : null;
     if (!cedula || !schedule || !reason || !['PENDIENTE', 'APROBADO', 'RECHAZADO'].includes(status)) {
       return res.status(400).json({ error: 'Cédula, fecha, horarios, motivo y estado son obligatorios y válidos' });
     }
