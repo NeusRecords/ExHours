@@ -1,4 +1,4 @@
-const ExcelJS = require('exceljs');
+const XLSX = require('xlsx');
 const { database } = require('../config/database');
 
 function isValidDate(value) {
@@ -387,12 +387,12 @@ async function exportApprovedRequests(req, res, next) {
       params
     );
 
-    const rowsForExcel = requests.map((reqRow) => {
+    const rowsForExcel = requests.map((request) => {
       const b = classifySchedule(
-        reqRow.work_date || reqRow.fecha,
-        reqRow.hora_inicio || reqRow.horaInicio,
-        reqRow.hora_fin || reqRow.horaFin,
-        reqRow.cedula
+        request.work_date || request.fecha,
+        request.hora_inicio || request.horaInicio,
+        request.hora_fin || request.horaFin,
+        request.cedula
       ) || {
         hed: 0,
         hen: 0,
@@ -404,14 +404,14 @@ async function exportApprovedRequests(req, res, next) {
       };
 
       return {
-        'Cédula': reqRow.cedula || '',
-        'Nombre Completo': reqRow.nombre_completo || reqRow.employee_name || reqRow.nombre || '',
-        'Fecha': reqRow.work_date ? String(reqRow.work_date).substring(0, 10) : '',
-        'Hora Inicio': reqRow.hora_inicio || '',
-        'Hora Fin': reqRow.hora_fin || '',
-        'Total Horas': parseFloat(reqRow.total_horas || reqRow.totalHours || 0),
-        'Motivo': reqRow.motivo || reqRow.reason || '',
-        'Estado': reqRow.status || 'APROBADA',
+        'Cédula': request.cedula || '',
+        'Nombre Completo': request.nombre_completo || request.employee_name || request.nombre || '',
+        'Fecha': request.work_date ? new Date(request.work_date).toISOString().split('T')[0] : '',
+        'Hora Inicio': request.hora_inicio || '',
+        'Hora Fin': request.hora_fin || '',
+        'Total Horas': parseFloat(request.total_horas || request.totalHours || 0),
+        'Motivo': request.motivo || request.reason || '',
+        'Estado': request.status || 'APROBADA',
         'HED': parseFloat(b.hed || 0),
         'HEN': parseFloat(b.hen || 0),
         'RN': parseFloat(b.rn || 0),
@@ -422,35 +422,17 @@ async function exportApprovedRequests(req, res, next) {
       };
     });
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Horas Extras');
-    worksheet.columns = [
-      { header: 'Cédula', key: 'Cédula', width: 18 },
-      { header: 'Nombre Completo', key: 'Nombre Completo', width: 28 },
-      { header: 'Fecha', key: 'Fecha', width: 14 },
-      { header: 'Hora Inicio', key: 'Hora Inicio', width: 14 },
-      { header: 'Hora Fin', key: 'Hora Fin', width: 14 },
-      { header: 'Total Horas', key: 'Total Horas', width: 12 },
-      { header: 'Motivo', key: 'Motivo', width: 28 },
-      { header: 'Estado', key: 'Estado', width: 14 },
-      { header: 'HED', key: 'HED', width: 10 },
-      { header: 'HEN', key: 'HEN', width: 10 },
-      { header: 'RN', key: 'RN', width: 10 },
-      { header: 'RNF', key: 'RNF', width: 10 },
-      { header: 'HF', key: 'HF', width: 10 },
-      { header: 'HEFD', key: 'HEFD', width: 10 },
-      { header: 'HEFN', key: 'HEFN', width: 10 },
-    ];
-    worksheet.addRows(rowsForExcel);
+    const worksheet = XLSX.utils.json_to_sheet(rowsForExcel);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Solicitudes');
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': 'attachment; filename=horas_extras_aprobadas.xlsx',
-    });
-    res.send(buffer);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Horas_Extras.xlsx');
+    return res.send(buffer);
   } catch (error) {
-    next(error);
+    console.error('Error al exportar Excel:', error);
+    return res.status(500).json({ error: 'Error al generar el archivo Excel' });
   }
 }
 
