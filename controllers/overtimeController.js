@@ -64,7 +64,10 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
   if (start === null || end === null || start === end) return null;
 
   const durationMinutes = end > start ? end - start : 1440 - start + end;
-  const isHolidayOrSunday = esFestivoODomingo(workDate);
+  const [year, month, day] = (workDate || '').substring(0, 10).split('-').map(Number);
+  const dateObj = new Date(year, month - 1, day);
+  const isSunday = Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day) && dateObj.getDay() === 0;
+  const isHolidayOrSunday = isSunday || esFestivoODomingo(workDate);
   const toHours = (minutes) => Number((minutes / 60).toFixed(2));
 
   let hf = 0;
@@ -74,33 +77,29 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
   let hed = 0;
   let hen = 0;
   let rn = 0;
+  let porcentajeRecargo = 0;
+  let tipoHora = 'Horas Extras';
 
-  let cursor = start;
-  let remaining = durationMinutes;
-  let ordinaryBaseMinutesUsed = 0;
+  if (isHolidayOrSunday) {
+    const ordinaryLimitMinutes = 8 * 60;
+    let remainingOrdinary = Math.min(durationMinutes, ordinaryLimitMinutes);
+    let cursor = start;
+    let remaining = durationMinutes;
 
-  while (remaining > 0) {
-    const minuteOfDay = cursor % 1440;
-    const isNightSegment = minuteOfDay >= 21 * 60 || minuteOfDay < 6 * 60;
-    const nextBoundary = minuteOfDay < 6 * 60
-      ? 6 * 60
-      : minuteOfDay < 21 * 60
-        ? 21 * 60
-        : 24 * 60;
-    const segmentMinutes = Math.min(remaining, nextBoundary - minuteOfDay);
+    while (remaining > 0) {
+      const minuteOfDay = cursor % 1440;
+      const isNightSegment = minuteOfDay >= 21 * 60 || minuteOfDay < 6 * 60;
+      const nextBoundary = minuteOfDay < 6 * 60 ? 6 * 60 : minuteOfDay < 21 * 60 ? 21 * 60 : 1440;
+      const segmentMinutes = Math.min(remaining, nextBoundary - minuteOfDay);
+      const assignedOrdinaryMinutes = Math.min(segmentMinutes, remainingOrdinary);
+      const extraMinutes = segmentMinutes - assignedOrdinaryMinutes;
 
-    if (isHolidayOrSunday) {
-      const availableOrdinaryMinutes = Math.max(0, 8 * 60 - ordinaryBaseMinutesUsed);
-      const ordinaryMinutes = Math.min(segmentMinutes, availableOrdinaryMinutes);
-      const extraMinutes = segmentMinutes - ordinaryMinutes;
-
-      if (ordinaryMinutes > 0) {
+      if (assignedOrdinaryMinutes > 0) {
+        hf += assignedOrdinaryMinutes;
         if (isNightSegment) {
-          rnf += ordinaryMinutes;
-        } else {
-          hf += ordinaryMinutes;
+          rnf += assignedOrdinaryMinutes;
         }
-        ordinaryBaseMinutesUsed += ordinaryMinutes;
+        remainingOrdinary -= assignedOrdinaryMinutes;
       }
 
       if (extraMinutes > 0) {
@@ -110,21 +109,41 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
           hefd += extraMinutes;
         }
       }
-    } else {
+
+      cursor += segmentMinutes;
+      remaining -= segmentMinutes;
+    }
+
+    porcentajeRecargo = (hf * 90 + rnf * 35 + hefd * 116.25 + hefn * 168.75) / durationMinutes;
+    tipoHora = hefd > 0 || hefn > 0 ? 'Jornada Ordinaria Dominical + Horas Extras Dominicales' : 'Jornada Ordinaria Dominical';
+  } else {
+    let cursor = start;
+    let remaining = durationMinutes;
+
+    while (remaining > 0) {
+      const minuteOfDay = cursor % 1440;
+      const isNightSegment = minuteOfDay >= 21 * 60 || minuteOfDay < 6 * 60;
+      const nextBoundary = minuteOfDay < 6 * 60 ? 6 * 60 : minuteOfDay < 21 * 60 ? 21 * 60 : 1440;
+      const segmentMinutes = Math.min(remaining, nextBoundary - minuteOfDay);
+
       if (isNightSegment) {
         hen += segmentMinutes;
         rn += segmentMinutes;
       } else {
         hed += segmentMinutes;
       }
+
+      cursor += segmentMinutes;
+      remaining -= segmentMinutes;
     }
 
-    cursor += segmentMinutes;
-    remaining -= segmentMinutes;
+    porcentajeRecargo = (hed * 25 + hen * 75 + rn * 35) / durationMinutes;
+    tipoHora = (hed > 0 && hen > 0) || rn > 0 ? 'Mixta' : 'Horas Extras';
   }
 
-  const totalHours = toHours(durationMinutes);
-  const breakdown = {
+  const diurnalHours = Number(toHours(hed + hefd + hf));
+  const nocturnalHours = Number(toHours(hen + hefn + rnf + rn));
+  const base = {
     hf: Number(toHours(hf)),
     rnf: Number(toHours(rnf)),
     hefd: Number(toHours(hefd)),
@@ -132,13 +151,20 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
     hed: Number(toHours(hed)),
     hen: Number(toHours(hen)),
     rn: Number(toHours(rn)),
+    porcentajeRecargo: Number((porcentajeRecargo || 0).toFixed(2)),
+    tipoHora: tipoHora || 'Horas Extras',
+    totalHours: Number((durationMinutes / 60).toFixed(2)),
+    diurnalHours,
+    nocturnalHours,
+    type: tipoHora || 'Horas Extras',
+    detail: tipoHora || 'Horas Extras',
+    surcharge: Number((porcentajeRecargo || 0).toFixed(2)),
+    isHolidayOrSunday,
   };
 
   return {
-    totalHours,
-    isHolidayOrSunday,
-    ...breakdown,
-    breakdown,
+    ...base,
+    breakdown: base,
   };
 }
 
@@ -188,6 +214,8 @@ function buildOfficialBreakdown(schedule) {
     hf: Number(source.hf ?? source.ordinaryDominicalHours ?? source.ordinary_dominical_hours ?? source.ordinary_diurnal_hours ?? 0),
     hefd: Number(source.hefd ?? source.extraDiurnaDominicalHours ?? source.extra_diurna_dominical_hours ?? 0),
     hefn: Number(source.hefn ?? source.extraNocturnaDominicalHours ?? source.extra_nocturna_dominical_hours ?? 0),
+    porcentajeRecargo: Number(source.porcentajeRecargo ?? source.porcentaje_recargo ?? source.surcharge ?? 0),
+    tipoHora: source.tipoHora ?? source.tipo_hora ?? source.type ?? 'Horas Extras',
   };
 
   if (source.isHolidayOrSunday || schedule?.isHolidayOrSunday) {
@@ -242,6 +270,10 @@ function normalizeRequestBreakdown(request) {
     hf: officialBreakdown.hf,
     hefd: officialBreakdown.hefd,
     hefn: officialBreakdown.hefn,
+    porcentaje_recargo: Number(request.porcentaje_recargo ?? request.porcentajeRecargo ?? officialBreakdown.porcentajeRecargo ?? 0),
+    porcentajeRecargo: Number(request.porcentaje_recargo ?? request.porcentajeRecargo ?? officialBreakdown.porcentajeRecargo ?? 0),
+    tipo_hora: request.tipo_hora ?? request.tipoHora ?? officialBreakdown.tipoHora ?? 'Horas Extras',
+    tipoHora: request.tipo_hora ?? request.tipoHora ?? officialBreakdown.tipoHora ?? 'Horas Extras',
   };
 }
 
@@ -373,11 +405,17 @@ async function createRequest(req, res, next) {
   try {
     const [employee] = await database.allAsync('SELECT nombre_completo FROM employees WHERE cedula = $1', [cedula.trim()]);
     if (!employee) return res.status(403).json({ error: 'La cédula no está registrada en el sistema. Solicite registro a su supervisor.' });
+    const totalHours = Number(schedule.totalHours ?? schedule.total_horas ?? 0);
+    const diurnalHours = Number(schedule.diurnalHours ?? ((schedule.hed ?? 0) + (schedule.hefd ?? 0) + (schedule.hf ?? 0)));
+    const nocturnalHours = Number(schedule.nocturnalHours ?? ((schedule.hen ?? 0) + (schedule.hefn ?? 0) + (schedule.rnf ?? 0) + (schedule.rn ?? 0)));
+    const tipoHora = schedule.tipoHora || schedule.tipo_hora || schedule.type || 'Horas Extras';
+    const porcentajeRecargo = Number(schedule.porcentajeRecargo ?? schedule.porcentaje_recargo ?? schedule.surcharge ?? 0);
+
     const result = await database.runAsync(
       `INSERT INTO overtime_requests (employee_name, cedula, work_date, hours, hora_inicio, hora_fin, total_horas, horas_diurnas, horas_nocturnas, tipo_hora, porcentaje_recargo, reason, evidencia_url, es_festivo)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING id`,
-      [employee.nombre_completo, cedula.trim(), workDate, schedule.totalHours, horaInicio, horaFin, schedule.totalHours, schedule.diurnalHours, schedule.nocturnalHours, schedule.type, schedule.surcharge, reason.trim(), req.file ? `/uploads/${req.file.filename}` : null, schedule.isHolidayOrSunday]
+      [employee.nombre_completo, cedula.trim(), workDate, totalHours, horaInicio, horaFin, totalHours, diurnalHours, nocturnalHours, tipoHora, porcentajeRecargo, reason.trim(), req.file ? `/uploads/${req.file.filename}` : null, schedule.isHolidayOrSunday]
     );
     const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = $1', [result.lastID]);
     res.status(201).json(normalizeRequestBreakdown(request));
@@ -425,9 +463,15 @@ async function updateRequest(req, res, next) {
     const [employee] = await database.allAsync('SELECT nombre_completo FROM employees WHERE cedula = $1', [cedula]);
     if (!employee) return res.status(403).json({ error: 'La cédula no está registrada en el sistema' });
     const reviewComment = req.body?.review_comment?.trim() || (status === current.status ? current.review_comment : null);
+    const totalHours = Number(schedule.totalHours ?? schedule.total_horas ?? 0);
+    const diurnalHours = Number(schedule.diurnalHours ?? ((schedule.hed ?? 0) + (schedule.hefd ?? 0) + (schedule.hf ?? 0)));
+    const nocturnalHours = Number(schedule.nocturnalHours ?? ((schedule.hen ?? 0) + (schedule.hefn ?? 0) + (schedule.rnf ?? 0) + (schedule.rn ?? 0)));
+    const tipoHora = schedule.tipoHora || schedule.tipo_hora || schedule.type || 'Horas Extras';
+    const porcentajeRecargo = Number(schedule.porcentajeRecargo ?? schedule.porcentaje_recargo ?? schedule.surcharge ?? 0);
+
     await database.runAsync(
       `UPDATE overtime_requests SET employee_name = $1, cedula = $2, work_date = $3, hours = $4, hora_inicio = $5, hora_fin = $6, total_horas = $7, horas_diurnas = $8, horas_nocturnas = $9, tipo_hora = $10, porcentaje_recargo = $11, reason = $12, status = $13, review_comment = $14, reviewed_at = CASE WHEN $15 = 'PENDIENTE' THEN NULL ELSE COALESCE(reviewed_at, CURRENT_TIMESTAMP) END WHERE id = $16`,
-      [employee.nombre_completo, cedula, workDate, schedule.totalHours, horaInicio, horaFin, schedule.totalHours, schedule.diurnalHours, schedule.nocturnalHours, schedule.type, schedule.surcharge, reason, status, reviewComment, status, req.params.id]
+      [employee.nombre_completo, cedula, workDate, totalHours, horaInicio, horaFin, totalHours, diurnalHours, nocturnalHours, tipoHora, porcentajeRecargo, reason, status, reviewComment, status, req.params.id]
     );
     const [request] = await database.allAsync('SELECT * FROM overtime_requests WHERE id = $1', [req.params.id]);
     res.json(normalizeRequestBreakdown(request));
