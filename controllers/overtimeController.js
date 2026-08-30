@@ -134,6 +134,16 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
       detail += ')';
     }
 
+    const breakdown = {
+      hed: 0,
+      hen: 0,
+      rn: 0,
+      rnf: Number(ordinaryNocturnalHours.toFixed(2)),
+      hf: Number(ordinaryTotalHours.toFixed(2)),
+      hefd: Number(extraDiurnalHours.toFixed(2)),
+      hefn: Number(extraNocturnalHours.toFixed(2)),
+    };
+
     return {
       totalHours: Number((durationMinutes / 60).toFixed(2)),
       diurnalHours,
@@ -151,6 +161,8 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
       detail,
       surcharge: weightedPercent,
       isHolidayOrSunday,
+      ...breakdown,
+      breakdown,
     };
   }
 
@@ -231,6 +243,32 @@ function getRequestFilters(query = {}) {
   return { filters, params };
 }
 
+function buildOfficialBreakdown(schedule) {
+  const source = schedule && typeof schedule === 'object' && schedule.breakdown ? schedule.breakdown : schedule || {};
+
+  const breakdown = {
+    hed: Number(source.hed ?? source.extraDiurnalHours ?? source.extra_diurnal_hours ?? 0),
+    hen: Number(source.hen ?? source.extraNocturnalHours ?? source.extra_nocturnal_hours ?? 0),
+    rn: Number(source.rn ?? source.nocturnalHours ?? source.horas_nocturnas ?? 0),
+    rnf: Number(source.rnf ?? source.ordinaryNocturnalHours ?? source.ordinary_nocturnal_hours ?? 0),
+    hf: Number(source.hf ?? source.ordinaryDominicalHours ?? source.ordinary_dominical_hours ?? source.ordinary_diurnal_hours ?? 0),
+    hefd: Number(source.hefd ?? source.extraDiurnaDominicalHours ?? source.extra_diurna_dominical_hours ?? 0),
+    hefn: Number(source.hefn ?? source.extraNocturnaDominicalHours ?? source.extra_nocturna_dominical_hours ?? 0),
+  };
+
+  if (source.isHolidayOrSunday || schedule?.isHolidayOrSunday) {
+    breakdown.hed = Number(source.hed ?? 0);
+    breakdown.hen = Number(source.hen ?? 0);
+    breakdown.rn = Number(source.rn ?? 0);
+    breakdown.rnf = Number(source.rnf ?? source.ordinaryNocturnalHours ?? source.ordinary_nocturnal_hours ?? 0);
+    breakdown.hf = Number(source.hf ?? source.ordinaryDominicalHours ?? source.ordinary_dominical_hours ?? 0);
+    breakdown.hefd = Number(source.hefd ?? source.extraDiurnaDominicalHours ?? source.extra_diurna_dominical_hours ?? 0);
+    breakdown.hefn = Number(source.hefn ?? source.extraNocturnaDominicalHours ?? source.extra_nocturna_dominical_hours ?? 0);
+  }
+
+  return breakdown;
+}
+
 function normalizeRequestBreakdown(request) {
   if (!request || typeof request !== 'object') return request;
 
@@ -243,28 +281,27 @@ function normalizeRequestBreakdown(request) {
     ? classifySchedule(workDate, startTime, endTime, cedula)
     : null;
 
-  if (!schedule) return request;
+  const officialBreakdown = buildOfficialBreakdown(schedule || {
+    hed: request.hed ?? request.hed ?? 0,
+    hen: request.hen ?? request.hen ?? 0,
+    rn: request.rn ?? 0,
+    rnf: request.rnf ?? 0,
+    hf: request.hf ?? request.hf ?? 0,
+    hefd: request.hefd ?? 0,
+    hefn: request.hefn ?? 0,
+  });
 
-  const breakdown = {
-    ordinaryDominicalHours: Number(schedule.ordinaryDominicalHours ?? 0),
-    ordinaryNocturnalHours: Number(schedule.ordinaryNocturnalHours ?? 0),
-    extraDiurnaDominicalHours: Number(schedule.extraDiurnaDominicalHours ?? 0),
-    extraNocturnaDominicalHours: Number(schedule.extraNocturnaDominicalHours ?? 0),
-    breakdown: {
-      ordinaryDominicalHours: Number(schedule.ordinaryDominicalHours ?? 0),
-      ordinaryNocturnalHours: Number(schedule.ordinaryNocturnalHours ?? 0),
-      extraDiurnaDominicalHours: Number(schedule.extraDiurnaDominicalHours ?? 0),
-      extraNocturnaDominicalHours: Number(schedule.extraNocturnaDominicalHours ?? 0),
-      totalHours: Number(schedule.totalHours ?? 0),
-      diurnalHours: Number(schedule.diurnalHours ?? 0),
-      nocturnalHours: Number(schedule.nocturnalHours ?? 0),
-      type: schedule.type ?? null,
-      detail: schedule.detail ?? null,
-      surcharge: schedule.surcharge ?? null,
-    },
+  return {
+    ...request,
+    breakdown: officialBreakdown,
+    hed: officialBreakdown.hed,
+    hen: officialBreakdown.hen,
+    rn: officialBreakdown.rn,
+    rnf: officialBreakdown.rnf,
+    hf: officialBreakdown.hf,
+    hefd: officialBreakdown.hefd,
+    hefn: officialBreakdown.hefn,
   };
-
-  return { ...request, ...breakdown, breakdown: breakdown.breakdown };
 }
 
 async function listRequests(req, res, next) {
@@ -334,25 +371,20 @@ async function exportApprovedRequests(req, res, next) {
       `SELECT employee_name, work_date, hora_inicio, hora_fin, total_horas, horas_diurnas, horas_nocturnas, tipo_hora, porcentaje_recargo, reason, status, review_comment, evidencia_url, es_festivo, created_at FROM overtime_requests WHERE ${filters.join(' AND ')} ORDER BY work_date DESC, created_at DESC`,
       params
     );
-    const headers = ['Empleado', 'Fecha', 'Horario (Inicio - Fin)', 'Total Horas', 'Horas Diurnas', 'Horas Nocturnas', 'Tipo de Hora', 'Detalle / Tipo de Hora', '% Recargo', 'Motivo', 'Estado', 'Comentario Supervisor', 'Evidencia', 'Festivo/Domingo', 'Fecha de Creacion'];
-    const rows = requests.map((request) => [
-      request.employee_name,
-      request.work_date,
-      `${request.hora_inicio || ''} - ${request.hora_fin || ''}`,
-      request.total_horas ?? request.hours,
-      request.horas_diurnas ?? '',
-      request.horas_nocturnas ?? '',
-      scheduleDetail(request),
-      request.tipo_hora,
-      request.porcentaje_recargo == null ? '' : `${request.porcentaje_recargo}%`,
-      request.reason,
-      request.status,
-      request.review_comment,
-      request.evidencia_url,
-      request.es_festivo ? 'SI' : 'NO',
-      request.created_at,
-    ]);
-    const csv = [headers, ...rows].map((row) => row.map((value, index) => csvValue(value, index === 9 || index === 11)).join(';')).join('\r\n');
+    const headers = ['HED', 'HEN', 'RN', 'RNF', 'HF', 'HEFD', 'HEFN'];
+    const rows = requests.map((request) => {
+      const breakdown = normalizeRequestBreakdown(request).breakdown || {};
+      return [
+        breakdown.hed ?? 0,
+        breakdown.hen ?? 0,
+        breakdown.rn ?? 0,
+        breakdown.rnf ?? 0,
+        breakdown.hf ?? 0,
+        breakdown.hefd ?? 0,
+        breakdown.hefn ?? 0,
+      ];
+    });
+    const csv = [headers, ...rows].map((row) => row.map((value) => csvValue(value)).join(';')).join('\r\n');
 
     res.set({
       'Content-Type': 'text/csv; charset=utf-8',
