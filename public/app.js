@@ -76,16 +76,23 @@ async function loadEmployeeHistory(cedulaOverride = null) {
   employeeList.innerHTML = requests.length ? requests.map(renderEmployeeRequest).join('') : '<p class="empty-state">No tienes solicitudes registradas.</p>';
 }
 
-async function validateEmployee() {
-  const cedula = form.elements.cedula.value.trim();
-  const nameField = form.elements.employeeName;
+async function validateEmployee(sourceForm = form, messageTarget = message) {
+  const cedula = sourceForm.elements.cedula.value.trim();
+  const nameField = sourceForm.elements.employeeName;
   nameField.value = '';
   if (!cedula) return;
   const response = await fetch(`/api/employees/search?cc=${encodeURIComponent(cedula)}`);
-  if (!response.ok) throw new Error('La cédula no está registrada en el sistema. Solicite registro a su supervisor.');
+  if (!response.ok) {
+    messageTarget.textContent = 'La cédula no está registrada en el sistema. Solicite registro a su supervisor.';
+    throw new Error(messageTarget.textContent);
+  }
   const employee = await response.json();
   nameField.value = employee.nombre_completo;
-  await loadEmployeeHistory();
+  form.elements.cedula.value = cedula;
+  rnForm.elements.cedula.value = cedula;
+  form.elements.employeeName.value = employee.nombre_completo;
+  rnForm.elements.employeeName.value = employee.nombre_completo;
+  await loadEmployeeHistory(cedula);
 }
 
 function formatDateValue(value) {
@@ -344,6 +351,14 @@ form.addEventListener('submit', async (event) => {
   }
 });
 
+const syncEmployeeIdentity = (sourceForm) => {
+  const cedula = sourceForm.elements.cedula.value;
+  const name = sourceForm.elements.employeeName.value;
+  const targetForm = sourceForm === form ? rnForm : form;
+  targetForm.elements.cedula.value = cedula;
+  targetForm.elements.employeeName.value = name;
+};
+form.elements.cedula.addEventListener('input', () => syncEmployeeIdentity(form));
 form.elements.cedula.addEventListener('change', () => validateEmployee().catch((error) => { message.textContent = error.message; }));
 form.elements.cedula.addEventListener('blur', () => validateEmployee().catch((error) => { message.textContent = error.message; }));
 
@@ -360,7 +375,9 @@ employeeTabs.forEach((tab) => {
     });
   });
 });
-rnForm.elements.cedula.addEventListener('blur', () => validateRnEmployee().catch((error) => { rnMessage.textContent = error.message; }));
+rnForm.elements.cedula.addEventListener('input', () => syncEmployeeIdentity(rnForm));
+rnForm.elements.cedula.addEventListener('change', () => validateEmployee(rnForm, rnMessage).catch((error) => { rnMessage.textContent = error.message; }));
+rnForm.elements.cedula.addEventListener('blur', () => validateEmployee(rnForm, rnMessage).catch((error) => { rnMessage.textContent = error.message; }));
 rnForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   rnMessage.textContent = '';
@@ -389,16 +406,6 @@ rnForm.addEventListener('submit', async (event) => {
     rnMessage.textContent = error.message;
   }
 });
-async function validateRnEmployee() {
-  const cedula = rnForm.elements.cedula.value.trim();
-  const nameField = rnForm.elements.employeeName;
-  nameField.value = '';
-  if (!cedula) return;
-  const response = await fetch(`/api/employees/search?cc=${encodeURIComponent(cedula)}`);
-  if (!response.ok) throw new Error('La cédula no está registrada en el sistema. Solicite registro a su supervisor.');
-  const employee = await response.json();
-  nameField.value = employee.nombre_completo;
-}
 document.querySelector('#supervisor-refresh').addEventListener('click', () => loadPendingRequests().catch((error) => { pendingList.innerHTML = `<p class="empty-state">${error.message}</p>`; }));
 document.querySelector('#export-csv').addEventListener('click', () => exportApprovedRequests().catch((error) => { message.textContent = error.message; }));
 document.querySelector('#btnExportConsolidated').addEventListener('click', () => exportConsolidatedRequests().catch((error) => { message.textContent = error.message; }));
