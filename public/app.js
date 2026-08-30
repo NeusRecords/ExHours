@@ -158,29 +158,35 @@ async function loadEmployees() {
 function getScheduleBreakdown(request) {
   const req = request || {};
   const b = req.breakdown || req;
-  const totalH = parseFloat(req.total_horas ?? req.totalHours ?? req.hours ?? 0);
-  const hf = parseFloat(b.hf || b.ordinaryDominicalHours || b.ordinary_dominical_hours || 0);
+  const totalH = parseFloat(req.total_horas || req.totalHours || 0);
+  const hf = parseFloat(b.hf || b.ordinaryDominicalHours || b.ordinary_dominical_hours || (req.is_sunday || req.is_festivo ? Math.min(totalH, 8) : 0));
   const rnf = parseFloat(b.rnf || b.ordinaryNocturnalHours || b.ordinary_nocturnal_hours || 0);
-  const hefd = parseFloat(b.hefd || b.extraDiurnaDominicalHours || b.extra_diurna_dominical_hours || 0);
+  const hefd = parseFloat(b.hefd || b.extraDiurnaDominicalHours || b.extra_diurna_dominical_hours || (req.is_sunday || req.is_festivo ? Math.max(0, totalH - 8) : 0));
   const hefn = parseFloat(b.hefn || b.extraNocturnaDominicalHours || b.extra_nocturna_dominical_hours || 0);
+  const hed = parseFloat(b.hed || b.extraDiurnaHours || b.extra_diurna_hours || 0);
+  const hen = parseFloat(b.hen || b.extraNocturnaHours || b.extra_nocturna_hours || 0);
+  const rn = parseFloat(b.rn || b.recargoNocturnoHours || b.recargo_nocturno_hours || 0);
 
-  return `Total: ${totalH.toFixed(2)} h · HF: ${hf.toFixed(2)} h · RNF: ${rnf.toFixed(2)} h · HEFD: ${hefd.toFixed(2)} h · HEFN: ${hefn.toFixed(2)} h`;
+  return `Total: ${totalH.toFixed(2)} h · HF: ${hf.toFixed(2)} h · RNF: ${rnf.toFixed(2)} h · HEFD: ${hefd.toFixed(2)} h · HEFN: ${hefn.toFixed(2)} h · HED: ${hed.toFixed(2)} h · HEN: ${hen.toFixed(2)} h · RN: ${rn.toFixed(2)} h`;
 }
 
 function renderEmployeeRequest(request) {
   const req = request || {};
   const b = req.breakdown || req;
-  const totalH = parseFloat(req.total_horas ?? req.totalHours ?? req.hours ?? 0);
-  const hf = parseFloat(b.hf || b.ordinaryDominicalHours || b.ordinary_dominical_hours || 0);
+  const totalH = parseFloat(req.total_horas || req.totalHours || 0);
+  const hf = parseFloat(b.hf || b.ordinaryDominicalHours || b.ordinary_dominical_hours || (req.is_sunday || req.is_festivo ? Math.min(totalH, 8) : 0));
   const rnf = parseFloat(b.rnf || b.ordinaryNocturnalHours || b.ordinary_nocturnal_hours || 0);
-  const hefd = parseFloat(b.hefd || b.extraDiurnaDominicalHours || b.extra_diurna_dominical_hours || 0);
+  const hefd = parseFloat(b.hefd || b.extraDiurnaDominicalHours || b.extra_diurna_dominical_hours || (req.is_sunday || req.is_festivo ? Math.max(0, totalH - 8) : 0));
   const hefn = parseFloat(b.hefn || b.extraNocturnaDominicalHours || b.extra_nocturna_dominical_hours || 0);
+  const hed = parseFloat(b.hed || b.extraDiurnaHours || b.extra_diurna_hours || 0);
+  const hen = parseFloat(b.hen || b.extraNocturnaHours || b.extra_nocturna_hours || 0);
+  const rn = parseFloat(b.rn || b.recargoNocturnoHours || b.recargo_nocturno_hours || 0);
 
   const evidence = request.evidencia_url ? `<a class="evidence-link" href="${escapeHtml(request.evidencia_url)}" target="_blank" rel="noopener">Ver evidencia</a>` : '';
   const holidayBadge = request.es_festivo ? '<span class="holiday-badge">Festivo/Domingo</span>' : '';
   const workDate = formatDateValue(request.work_date);
   const surcharge = formatPercentage(request.porcentaje_recargo);
-  const scheduleBreakdown = `Total: ${totalH.toFixed(2)} h · HF: ${hf.toFixed(2)} h · RNF: ${rnf.toFixed(2)} h · HEFD: ${hefd.toFixed(2)} h · HEFN: ${hefn.toFixed(2)} h`;
+  const scheduleBreakdown = `Total: ${totalH.toFixed(2)} h · HF: ${hf.toFixed(2)} h · RNF: ${rnf.toFixed(2)} h · HEFD: ${hefd.toFixed(2)} h · HEFN: ${hefn.toFixed(2)} h · HED: ${hed.toFixed(2)} h · HEN: ${hen.toFixed(2)} h · RN: ${rn.toFixed(2)} h`;
   return `<article class="request"><div><p class="request-title">${escapeHtml(workDate)} · ${escapeHtml(String(req.total_horas ?? req.totalHours ?? req.hours ?? totalH))} h ${holidayBadge}</p><p class="request-meta">${escapeHtml(req.hora_inicio || '--:--')} - ${escapeHtml(req.hora_fin || '--:--')} · ${escapeHtml(scheduleBreakdown)}</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(req.tipo_hora || 'Sin clasificar')}</strong> · ${surcharge}</p><p class="request-reason">${escapeHtml(req.reason)}</p>${req.review_comment ? `<p class="review-comment"><strong>Comentario del supervisor:</strong> ${escapeHtml(req.review_comment)}</p>` : ''}${evidence}</div><span class="badge ${req.status.toLowerCase()}">${statusLabels[req.status]}</span></article>`;
 }
 
@@ -188,11 +194,14 @@ function renderPendingRequest(request) {
   requestCache.set(String(request.id), request);
   const req = request || {};
   const b = req.breakdown || req;
-  const totalH = parseFloat(req.total_horas ?? req.totalHours ?? req.hours ?? 0);
-  const hf = parseFloat(b.hf || b.ordinaryDominicalHours || b.ordinary_dominical_hours || 0);
+  const totalH = parseFloat(req.total_horas || req.totalHours || 0);
+  const hf = parseFloat(b.hf || b.ordinaryDominicalHours || b.ordinary_dominical_hours || (req.is_sunday || req.is_festivo ? Math.min(totalH, 8) : 0));
   const rnf = parseFloat(b.rnf || b.ordinaryNocturnalHours || b.ordinary_nocturnal_hours || 0);
-  const hefd = parseFloat(b.hefd || b.extraDiurnaDominicalHours || b.extra_diurna_dominical_hours || 0);
+  const hefd = parseFloat(b.hefd || b.extraDiurnaDominicalHours || b.extra_diurna_dominical_hours || (req.is_sunday || req.is_festivo ? Math.max(0, totalH - 8) : 0));
   const hefn = parseFloat(b.hefn || b.extraNocturnaDominicalHours || b.extra_nocturna_dominical_hours || 0);
+  const hed = parseFloat(b.hed || b.extraDiurnaHours || b.extra_diurna_hours || 0);
+  const hen = parseFloat(b.hen || b.extraNocturnaHours || b.extra_nocturna_hours || 0);
+  const rn = parseFloat(b.rn || b.recargoNocturnoHours || b.recargo_nocturno_hours || 0);
 
   const reviewForm = req.status === 'PENDIENTE'
     ? `<form class="review-form" data-id="${req.id}"><label>Comentario de revisión<textarea name="comment" rows="2" maxlength="500" required placeholder="Escribe el motivo de tu decisión"></textarea></label><div class="review-actions"><button type="submit" data-status="APROBADO">Aprobar</button><button class="reject-button" type="submit" data-status="RECHAZADO">Rechazar</button></div></form>`
@@ -204,7 +213,7 @@ function renderPendingRequest(request) {
   const holidayBadge = req.es_festivo ? '<span class="holiday-badge">Festivo/Domingo</span>' : '';
   const workDate = formatDateValue(req.work_date);
   const surcharge = formatPercentage(req.porcentaje_recargo);
-  const scheduleBreakdown = `Total: ${totalH.toFixed(2)} h · HF: ${hf.toFixed(2)} h · RNF: ${rnf.toFixed(2)} h · HEFD: ${hefd.toFixed(2)} h · HEFN: ${hefn.toFixed(2)} h`;
+  const scheduleBreakdown = `Total: ${totalH.toFixed(2)} h · HF: ${hf.toFixed(2)} h · RNF: ${rnf.toFixed(2)} h · HEFD: ${hefd.toFixed(2)} h · HEFN: ${hefn.toFixed(2)} h · HED: ${hed.toFixed(2)} h · HEN: ${hen.toFixed(2)} h · RN: ${rn.toFixed(2)} h`;
   return `<article class="request supervisor-request"><div><p class="request-title">${escapeHtml(req.employee_name)} · ${escapeHtml(workDate)} ${holidayBadge}</p><p class="request-meta">Horario: ${escapeHtml(req.hora_inicio || '--:--')} - ${escapeHtml(req.hora_fin || '--:--')}</p><p class="request-meta">${escapeHtml(scheduleBreakdown)}</p><p class="request-meta">Detalle / Tipo de Hora: <strong>${escapeHtml(detail)}</strong> · Recargo: <strong>${surcharge}</strong></p><p class="request-reason">${escapeHtml(req.reason)}</p>${evidence}</div><div class="request-actions">${reviewForm}<div class="row-actions"><button class="action-link" data-edit-request="${req.id}" type="button">Editar</button><button class="action-link danger-link" data-delete-request="${req.id}" type="button">Eliminar</button></div></div></article>`;
 }
 
