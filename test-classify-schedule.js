@@ -53,6 +53,44 @@ assertEqual('domingo 02:00-20:00', domingoCaso, {
   },
 });
 
+const domingoIsoCaso = classifySchedule('2026-08-30T00:00:00.000Z', '02:00', '20:00');
+assertEqual('domingo ISO con hora', domingoIsoCaso, {
+  hf: 8,
+  rnf: 4,
+  hefd: 10,
+  hefn: 0,
+  hed: 0,
+  hen: 0,
+  rn: 0,
+  porcentajeRecargo: 112.36,
+  tipoHora: 'Jornada Ordinaria Dominical + Horas Extras Dominicales',
+  totalHours: 18,
+  diurnalHours: 18,
+  nocturnalHours: 4,
+  type: 'Jornada Ordinaria Dominical + Horas Extras Dominicales',
+  detail: 'Jornada Ordinaria Dominical + Horas Extras Dominicales',
+  surcharge: 112.36,
+  isHolidayOrSunday: true,
+  breakdown: {
+    hf: 8,
+    rnf: 4,
+    hefd: 10,
+    hefn: 0,
+    hed: 0,
+    hen: 0,
+    rn: 0,
+    porcentajeRecargo: 112.36,
+    tipoHora: 'Jornada Ordinaria Dominical + Horas Extras Dominicales',
+    totalHours: 18,
+    diurnalHours: 18,
+    nocturnalHours: 4,
+    type: 'Jornada Ordinaria Dominical + Horas Extras Dominicales',
+    detail: 'Jornada Ordinaria Dominical + Horas Extras Dominicales',
+    surcharge: 112.36,
+    isHolidayOrSunday: true,
+  },
+});
+
 const ordinarioCaso = classifySchedule('2026-08-28', '20:00', '00:00');
 assertEqual('ordinario 20:00-00:00', ordinarioCaso, {
   hf: 0,

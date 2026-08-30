@@ -1,8 +1,21 @@
 const XLSX = require('xlsx');
 const { database } = require('../config/database');
 
+function normalizeWorkDate(value) {
+  if (!value && value !== '') return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const isoDate = trimmed.match(/^\d{4}-\d{2}-\d{2}T.*$/)
+    ? trimmed.split('T')[0]
+    : trimmed;
+  return /^\d{4}-\d{2}-\d{2}$/.test(isoDate) ? isoDate : null;
+}
+
 function isValidDate(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+  const normalized = normalizeWorkDate(value);
+  if (!normalized) return false;
+  return !Number.isNaN(Date.parse(`${normalized}T00:00:00Z`));
 }
 
 function timeToMinutes(value) {
@@ -59,15 +72,18 @@ function esFestivoODomingo(fechaStr) {
 }
 
 function classifySchedule(workDate, startTime, endTime, cedula = null) {
+  const normalizedDate = normalizeWorkDate(workDate);
+  if (!normalizedDate) return null;
+
   const start = timeToMinutes(startTime);
   const end = timeToMinutes(endTime);
   if (start === null || end === null || start === end) return null;
 
   const durationMinutes = end > start ? end - start : 1440 - start + end;
-  const [year, month, day] = (workDate || '').substring(0, 10).split('-').map(Number);
+  const [year, month, day] = normalizedDate.split('-').map(Number);
   const dateObj = new Date(year, month - 1, day);
   const isSunday = Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day) && dateObj.getDay() === 0;
-  const isHolidayOrSunday = isSunday || esFestivoODomingo(workDate);
+  const isHolidayOrSunday = isSunday || esFestivoODomingo(normalizedDate);
   const toHours = (minutes) => Number((minutes / 60).toFixed(2));
 
   let hf = 0;
