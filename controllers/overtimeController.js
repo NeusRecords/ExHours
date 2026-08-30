@@ -155,7 +155,6 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
 
       if (isNightSegment) {
         hen += segmentMinutes;
-        rn += segmentMinutes;
       } else {
         hed += segmentMinutes;
       }
@@ -164,8 +163,8 @@ function classifySchedule(workDate, startTime, endTime, cedula = null) {
       remaining -= segmentMinutes;
     }
 
-    porcentajeRecargo = (hed * 25 + hen * 75 + rn * 35) / durationMinutes;
-    tipoHora = (hed > 0 && hen > 0) || rn > 0 ? 'Mixta' : 'Horas Extras';
+    porcentajeRecargo = (hed * 25 + hen * 75) / durationMinutes;
+    tipoHora = hed > 0 && hen > 0 ? 'Mixta' : 'Horas Extras';
   }
 
   const diurnalHours = Number(toHours(hed + hefd + hf));
